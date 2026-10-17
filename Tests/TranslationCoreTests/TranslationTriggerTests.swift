@@ -23,13 +23,24 @@ func rejectsWrongIncompleteAndExcessiveMarkers(trigger: TranslationTrigger) {
     }
 }
 
-@Test func rejectsMarkerInMiddleOfLineAndNonemptySelection() {
+@Test func rejectsMarkerInMiddleOfLineAndSelectionBeforeLineEnd() {
     let text = "日本語...続き"
     #expect(throws: InputError.noTrigger) {
         try TextTarget(text: text, selection: NSRange(location: 6, length: 0), mode: .triggeredLine(.dots))
     }
     #expect(throws: InputError.noTrigger) {
-        try TextTarget(text: "日本語...", selection: NSRange(location: 3, length: 3), mode: .triggeredLine(.dots))
+        try TextTarget(text: "日本語...", selection: NSRange(location: 0, length: 2), mode: .triggeredLine(.dots))
+    }
+}
+
+@Test func japanesePeriodsAndCompositionSelectionCanTriggerTranslation() throws {
+    let target = try TextTarget(text: "日本語。。。", selection: NSRange(location: 3, length: 3), mode: .triggeredLine(.dots))
+    #expect(target.sourceText == "日本語")
+    #expect(target.replacing(with: "Japanese") == "Japanese")
+    #expect(TranslationTrigger.dots.accepts("。"))
+    #expect(!TranslationTrigger.semicolons.accepts("。"))
+    #expect(throws: InputError.noTrigger) {
+        try TextTarget(text: "日本語。。。。", selection: NSRange(location: 7, length: 0), mode: .triggeredLine(.dots))
     }
 }
 

@@ -13,7 +13,7 @@ public enum InputError: LocalizedError, Equatable {
         case .secure: "パスワード欄は翻訳しません。"
         case .changed: "入力内容・選択範囲・入力先が変わったため、反映を中止しました。"
         case .emptyTranslation: "訳文が空だったため、反映しませんでした。"
-        case .unconfirmed: "反映を確認できませんでした。再試行せず、入力欄を確認してください。クリップボードは復元していません。"
+        case .unconfirmed: "反映を確認できませんでした。再試行せず、入力欄を確認してください。"
         }
     }
 }
@@ -51,7 +51,8 @@ public struct TextTarget: Equatable, Sendable {
         let contents = string.substring(with: range)
         let source: String
         if case .triggeredLine(let trigger) = mode {
-            guard selection.length == 0, selection.location == NSMaxRange(range) else { throw InputError.noTrigger }
+            // IMEs may select the active composition at the end of the line.
+            guard NSMaxRange(selection) == NSMaxRange(range) else { throw InputError.noTrigger }
             guard let beforeMarker = trigger.source(in: contents) else { throw InputError.noTrigger }
             source = beforeMarker
         } else {

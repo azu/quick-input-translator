@@ -32,12 +32,20 @@ CarbonのRegisterEventHotKeyでCtrl＋Shift＋Aを登録する。
 
 翻訳の合図はNSEventのローカル・グローバルのイベント監視で検出する。
 両方の監視が必要なことと、グローバルのキー監視にアクセシビリティ権限が必要なことは、[Appleのイベント監視ガイド](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/EventOverview/MonitoringEvents/MonitoringEvents.html)に基づく。
-権限を確認してから監視を開始し、権限状態の再確認時に開始・停止する。
+自アプリのイベント監視は起動時に開始する。他アプリのイベント監視は権限を確認してから開始し、権限状態の再確認時に開始・停止する。
 監視では選んだ合図の記号の連続回数だけを持ち、キーの履歴は保持しない。
-三回目の記号でフォーカス中の入力欄の識別子を保存し、入力がアプリへ反映されるまで最大200ミリ秒待つ。
+三回目の記号でフォーカス中の入力欄の識別子を保存し、入力がアプリへ反映されるまで最大600ミリ秒待つ。
 待機中に別のキーやクリックがあった場合は候補を取り消す。
 同じ入力欄にカーソルがあり、行末が合図になっていることを確認してから翻訳する。
 貼り付けによる文字列設定はキー入力の連続と見なさない。
+`...`の設定では、キーイベントの`。`も同じ合図の文字として受け付ける。
+
+自分のアプリ内の入力欄は、ローカルイベントのwindowからNSTextViewを識別する。
+自分のメインスレッドへAXの処理を送り返す方法に依存せず、NSTextViewから全文と選択範囲を取得する。
+未確定の行末に合図がある場合は、NSTextInputClientのunmarkTextで入力を受け付け、Returnキーを送らずに確定する。
+[AppleのunmarkText資料](https://developer.apple.com/documentation/appkit/nstextinputclient/unmarktext())に基づく。
+自分の入力欄の反映は、shouldChangeText・textStorageの変更・didChangeTextを通して行い、SwiftUIへの変更通知を送る。
+他アプリではAXで公開された入力情報を取得し、公開されていない未確定文字を推測で補わない。
 
 入力の取得にはAXFocusedUIElement、AXValue、AXSelectedTextRangeを使う。
 パスワードのsubroleを先に確認して除外し、編集可能と確認できること、および選択範囲を変更できることを確認する。
@@ -82,7 +90,8 @@ sequenceDiagram
 
 TextTargetは全文、元の選択範囲、置換範囲、対象文字列を持つ値とする。
 TranslationTriggerは三つの候補を持つ列挙型とする。保存値が未設定または不明なら`...`を使う。
-CapturedInputは対象AXUIElement、プロセスID、TextTargetを一回の処理中だけ保持する。
+CapturedInputは入力先の識別子とTextTargetを一回の処理中だけ保持する。
+入力先は、自アプリのNSTextViewまたは他アプリのAXUIElementとプロセスIDで表す。
 クリップボードは各NSPasteboardItemの全typeとDataを一時保持する。
 永続化するデータ間の関係がないためER図は不要。
 
@@ -92,6 +101,10 @@ CapturedInputは対象AXUIElement、プロセスID、TextTargetを一回の処�
 準備画面から権限設定を開き、日本語・英語のモデルを準備し、テスト用入力欄で試せる。
 内部の翻訳処理と入力処理はプロトコルで分ける。
 状態は準備完了、翻訳中、完了、理由付きの失敗とし、本文を状態文字列に含めない。
+進行と結果は、入力欄の近くの非アクティブなNSPanelにも表示する。
+NSPanelはキーウィンドウにならず、クリックを受けず、入力欄のフォーカスを維持する。
+自アプリの入力位置はfirstRect、他アプリの位置はAXBoundsForRangeで求める。位置を取得できなければポインター付近に表示する。
+処理中は回転表示を出し、完了・失敗は5秒後に閉じる。
 
 ## 外部サービスとの連携方式
 
@@ -109,7 +122,8 @@ Translation frameworkのja→enを使い、未インストールや翻訳失敗�
 ## 認証認可に関する特記事項
 
 AXIsProcessTrustedWithOptionsでアクセシビリティ権限を案内する。
-権限要求は準備画面の操作で行い、権限がなければ入力の取得を開始しない。
+権限要求は準備画面の操作で行い、権限がなければ他アプリの入力の取得を開始しない。
+自アプリ内では入力元のNSTextViewを直接扱い、AXの権限を要求しない。
 アプリはApp Sandboxを使わず、ローカル実行用のapp bundleとして生成する。
 
 ## セキュリティ上の留意事項

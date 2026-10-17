@@ -54,7 +54,7 @@ struct SetupView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Quick Translate Input").font(.title2.bold())
             Text("日本語 → 英語 · 行末の合図で翻訳")
-            Text("日本語を確定し、行末に半角で \(model.trigger.rawValue) を入力すると、その行を翻訳します。Ctrl＋Shift＋Aは行選択だけを行います。翻訳前の行選択は不要です。")
+            Text("行末に \(model.trigger.rawValue) を入力すると、その行を翻訳します。合図が ... のときは、日本語入力中の 。。。 でも反応します。Ctrl＋Shift＋Aは行選択だけを行います。")
             Picker("翻訳の合図", selection: $model.trigger) {
                 ForEach(TranslationTrigger.allCases, id: \.self) { trigger in
                     Text(trigger.rawValue).tag(trigger)
@@ -65,7 +65,7 @@ struct SetupView: View {
             GroupBox("初回の準備") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("行選択のショートカット: \(model.shortcutReady ? "登録済み" : "未登録")")
-                    Text("翻訳の合図の検出: \(model.monitorReady ? "有効" : "権限を許可して状態を再確認してください")")
+                    Text("他アプリの合図検出: \(model.monitorReady ? "有効" : "権限が必要（下のテスト欄は利用できます）")")
                     HStack {
                         Text("アクセシビリティ: \(model.hasPermission ? "許可済み" : "未許可")")
                         Spacer()
