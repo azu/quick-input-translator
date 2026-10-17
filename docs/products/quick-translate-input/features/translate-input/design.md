@@ -425,6 +425,13 @@ AXSecureTextFieldの判定を先に行うことで、取得後に本文の種類
 候補が一つなら自動で選び、それ以外はCODE_SIGN_IDENTITYで指定する。
 署名に使う秘密鍵とキーチェーンの信頼設定は、既存のものを利用する。
 
+### アプリアイコン
+
+アプリアイコンには、青いタイルと「あ」「A」の吹き出しを描いた画像を使う。
+PNGからmacOS標準のsipsとiconutilで各サイズを持つAppIcon.icnsを生成し、アプリ内のContents/Resourcesへ置く。
+Info.plistのCFBundleIconFileで参照し、ローカルビルドと配布用ビルドの両方に同じアイコンを含める。
+アイコンの生成と配置は署名前に済ませ、署名の検証対象に含める。
+
 ### アプリ名の変更
 
 表示名と生成先をQuick Input Translatorにそろえる。

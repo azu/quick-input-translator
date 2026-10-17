@@ -9,8 +9,9 @@ if [[ -e "$staged_bundle" ]]; then
     printf '%s\n' 'Bundle destination already exists.' >&2
     exit 1
 fi
-mkdir -p "$staged_bundle/Contents/MacOS"
+mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources"
 cp "$binary_path" "$staged_bundle/Contents/MacOS/QuickTranslateInput"
+bash "$project_dir/scripts/build-icon.sh" "$staged_bundle/Contents/Resources/AppIcon.icns"
 cat > "$staged_bundle/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -19,6 +20,7 @@ cat > "$staged_bundle/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>info.efcl.quick-translate-input</string>
 <key>CFBundleName</key><string>Quick Input Translator</string>
 <key>CFBundleDisplayName</key><string>Quick Input Translator</string>
+<key>CFBundleIconFile</key><string>AppIcon.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>
 <key>CFBundleVersion</key><string>1</string>
