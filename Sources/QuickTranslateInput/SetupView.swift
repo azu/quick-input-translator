@@ -1,5 +1,6 @@
 import SwiftUI
 import Translation
+import TranslationCore
 @preconcurrency import ApplicationServices
 
 @MainActor final class AppModel: ObservableObject {
@@ -7,7 +8,18 @@ import Translation
     @Published var shortcutReady = false
     @Published var modelStatus = "未確認"
     @Published var hasPermission = AXIsProcessTrusted()
+    @Published var monitorReady = false
+    @Published var trigger: TranslationTrigger = TranslationTrigger(
+        rawValue: UserDefaults.standard.string(forKey: "translationTrigger") ?? ""
+    ) ?? .dots {
+        didSet {
+            UserDefaults.standard.set(trigger.rawValue, forKey: "translationTrigger")
+            onTriggerChange?(trigger)
+        }
+    }
     var onStatusChange: ((String) -> Void)?
+    var onPermissionChange: ((Bool) -> Void)?
+    var onTriggerChange: ((TranslationTrigger) -> Void)?
 
     func setStatus(_ message: String) {
         status = message
@@ -17,10 +29,12 @@ import Translation
     func requestPermission() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         hasPermission = AXIsProcessTrustedWithOptions(options)
+        onPermissionChange?(hasPermission)
     }
 
     func refresh() async {
         hasPermission = AXIsProcessTrusted()
+        onPermissionChange?(hasPermission)
         switch await LanguageAvailability().status(from: AppleTranslationEngine.source, to: AppleTranslationEngine.target) {
         case .installed: modelStatus = "準備済み"
         case .supported: modelStatus = "ダウンロードが必要"
@@ -39,12 +53,19 @@ struct SetupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Quick Translate Input").font(.title2.bold())
-            Text("日本語 → 英語 · Ctrl＋Shift＋A")
-            Text("選択中なら選択部分、未選択なら現在の行を翻訳します。入力を確定してからキーを押し、離してください。")
+            Text("日本語 → 英語 · 行末の合図で翻訳")
+            Text("日本語を確定し、行末に半角で \(model.trigger.rawValue) を入力すると、その行を翻訳します。Ctrl＋Shift＋Aは行選択だけを行います。翻訳前の行選択は不要です。")
+            Picker("翻訳の合図", selection: $model.trigger) {
+                ForEach(TranslationTrigger.allCases, id: \.self) { trigger in
+                    Text(trigger.rawValue).tag(trigger)
+                }
+            }
+            .pickerStyle(.segmented)
 
             GroupBox("初回の準備") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("ショートカット: \(model.shortcutReady ? "登録済み" : "未登録")")
+                    Text("行選択のショートカット: \(model.shortcutReady ? "登録済み" : "未登録")")
+                    Text("翻訳の合図の検出: \(model.monitorReady ? "有効" : "権限を許可して状態を再確認してください")")
                     HStack {
                         Text("アクセシビリティ: \(model.hasPermission ? "許可済み" : "未許可")")
                         Spacer()
@@ -87,7 +108,7 @@ struct SetupView: View {
             do {
                 try await session.prepareTranslation()
                 await model.refresh()
-                await model.setStatus("言語モデルを準備しました。入力欄でCtrl＋Shift＋Aを押してください。")
+                await model.setStatus("言語モデルを準備しました。行末に選択した合図を入力してください。")
             } catch {
                 await model.setStatus("言語モデルを準備できませんでした: \(error.localizedDescription)")
             }

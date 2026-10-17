@@ -27,13 +27,24 @@ AppKitでメニューと準備画面を管理し、SwiftUIのtranslationTaskで�
 [Appleの初期化API](https://developer.apple.com/documentation/translation/translationsession/init(installedsource:target:))と[公式サンプル](https://developer.apple.com/documentation/translation/translating-text-within-your-app)に基づく。
 
 CarbonのRegisterEventHotKeyでCtrl＋Shift＋Aを登録する。
-修飾キーが離された後に入力を取得し、処理中の追加呼び出しは無視する。
+修飾キーが離された後に現在の行を選択する。翻訳は呼び出さず、既存の選択がある場合は維持する。
 登録の失敗は準備画面で知らせる。
+
+翻訳の合図はNSEventのローカル・グローバルのイベント監視で検出する。
+両方の監視が必要なことと、グローバルのキー監視にアクセシビリティ権限が必要なことは、[Appleのイベント監視ガイド](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/EventOverview/MonitoringEvents/MonitoringEvents.html)に基づく。
+権限を確認してから監視を開始し、権限状態の再確認時に開始・停止する。
+監視では選んだ合図の記号の連続回数だけを持ち、キーの履歴は保持しない。
+三回目の記号でフォーカス中の入力欄の識別子を保存し、入力がアプリへ反映されるまで最大200ミリ秒待つ。
+待機中に別のキーやクリックがあった場合は候補を取り消す。
+同じ入力欄にカーソルがあり、行末が合図になっていることを確認してから翻訳する。
+貼り付けによる文字列設定はキー入力の連続と見なさない。
 
 入力の取得にはAXFocusedUIElement、AXValue、AXSelectedTextRangeを使う。
 パスワードのsubroleを先に確認して除外し、編集可能と確認できること、および選択範囲を変更できることを確認する。
 編集可能かどうかはAXIsEditable、またはAXValueの書き込み可否で判断する。AXValueへの書き込み自体は行わない。
 全文の範囲はNSStringとNSRangeのUTF-16単位で扱い、行末の改行を除く論理行を求める。
+翻訳用のTextTargetでは置換範囲に合図を含め、翻訳元の文字列からだけ合図を取り除く。
+原文と訳文が同じでも、合図を除去するために置換する。
 
 翻訳後にフォーカス・全文・選択範囲を再確認し、対象範囲を選択してCommand＋Vを送る。
 AXSelectedTextはSDKの定義上読み取り属性なので、直接の書き換えに依存しない。
@@ -53,7 +64,8 @@ sequenceDiagram
     participant App as メニューバーアプリ
     participant Input as フォーカス中の入力欄
     participant Translation as Translation framework
-    User->>App: Ctrl＋Shift＋A
+    User->>Input: 行末に設定した合図を入力
+    App->>App: 合図の連続と入力先を確認
     App->>Input: 全文・選択範囲を取得
     App->>Translation: 日本語の対象範囲を翻訳
     Translation-->>App: 英語の訳文
@@ -69,13 +81,14 @@ sequenceDiagram
 ## データモデル・ER 図
 
 TextTargetは全文、元の選択範囲、置換範囲、対象文字列を持つ値とする。
+TranslationTriggerは三つの候補を持つ列挙型とする。保存値が未設定または不明なら`...`を使う。
 CapturedInputは対象AXUIElement、プロセスID、TextTargetを一回の処理中だけ保持する。
 クリップボードは各NSPasteboardItemの全typeとDataを一時保持する。
 永続化するデータ間の関係がないためER図は不要。
 
 ## API・インターフェース
 
-利用者の入口はショートカットとメニューバーの「準備とテスト」。
+利用者の入口は行末への合図入力、行選択のショートカット、メニューバーの「準備とテスト」。
 準備画面から権限設定を開き、日本語・英語のモデルを準備し、テスト用入力欄で試せる。
 内部の翻訳処理と入力処理はプロトコルで分ける。
 状態は準備完了、翻訳中、完了、理由付きの失敗とし、本文を状態文字列に含めない。
@@ -87,9 +100,11 @@ Translation frameworkのja→enを使い、未インストールや翻訳失敗�
 
 ## データの取り扱い設計
 
-入力はショートカット実行時に取得し、処理中だけメモリに保持する。
+入力欄の本文は翻訳の合図を確認するとき、行選択時、反映確認時に取得し、処理中だけメモリに保持する。
+監視では選んだ合図の記号の連続回数だけを保存し、他の文字は保存しない。
 全文・訳文・クリップボードの内容をログへ出さない。
-ユーザー設定や本文のファイル保存は行わない。
+合図の設定だけをUserDefaultsのtranslationTriggerキーに保存する。本文のファイル保存は行わない。
+設定を変更すると待機中の候補と連続回数を取り消し、変更後の合図だけを使う。
 
 ## 認証認可に関する特記事項
 

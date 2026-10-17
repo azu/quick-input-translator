@@ -5,7 +5,7 @@ import Foundation
 }
 
 @MainActor public protocol InputAccess {
-    func capture() throws -> TextTarget
+    func capture(mode: CaptureMode) throws -> TextTarget
     func replace(_ target: TextTarget, with translation: String) async throws
     func clear()
 }
@@ -21,20 +21,22 @@ import Foundation
     }
 
     /// Returns false for a duplicate invocation; the original operation owns its state.
-    @discardableResult public func perform() async throws -> Bool {
+    @discardableResult public func perform(mode: CaptureMode = .selectionOrCurrentLine,
+                                          onStart: (() -> Void)? = nil) async throws -> Bool {
         guard !isRunning else { return false }
         isRunning = true
         defer {
             input.clear()
             isRunning = false
         }
-        let target = try input.capture()
+        let target = try input.capture(mode: mode)
+        onStart?()
         let translated = try await engine.translate(target.sourceText)
         try Task.checkCancellation()
         guard !translated.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw InputError.emptyTranslation
         }
-        if translated != target.sourceText {
+        if target.replacing(with: translated) != target.fullText {
             try await input.replace(target, with: translated)
         }
         return true

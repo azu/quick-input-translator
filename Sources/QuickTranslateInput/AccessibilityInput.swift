@@ -3,18 +3,55 @@ import ApplicationServices
 import TranslationCore
 
 @MainActor final class AccessibilityInput: InputAccess {
+    struct FocusToken {
+        fileprivate let element: AXUIElement
+        fileprivate let pid: pid_t
+    }
     private struct CapturedInput {
         let element: AXUIElement
         let pid: pid_t
         let target: TextTarget
     }
     private var captured: CapturedInput?
+    private var expectedFocus: FocusToken?
 
-    func clear() { captured = nil }
+    func clear() {
+        captured = nil
+        expectedFocus = nil
+    }
 
-    func capture() throws -> TextTarget {
+    func focusToken() throws -> FocusToken {
         guard AXIsProcessTrusted() else { throw InputError.permission }
         let element = try focusedElement()
+        try ensureEditable(element)
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(element, &pid) == .success,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else { throw InputError.changed }
+        return FocusToken(element: element, pid: pid)
+    }
+
+    func hasFocus(_ token: FocusToken) -> Bool {
+        NSWorkspace.shared.frontmostApplication?.processIdentifier == token.pid
+            && (try? focusedElement()).map { CFEqual($0, token.element) } == true
+    }
+
+    func expectFocus(_ token: FocusToken) { expectedFocus = token }
+
+    func selectCurrentLine() throws {
+        defer { clear() }
+        let target = try capture(mode: .selectionOrCurrentLine)
+        guard let saved = captured else { throw InputError.changed }
+        try validate(saved)
+        try setRange(target.replacementRange, on: saved.element)
+        guard try selectedRange(saved.element) == target.replacementRange else { throw InputError.unsupported }
+    }
+
+    func capture(mode: CaptureMode) throws -> TextTarget {
+        guard AXIsProcessTrusted() else { throw InputError.permission }
+        let element = try focusedElement()
+        if let expectedFocus {
+            guard hasFocus(expectedFocus), CFEqual(element, expectedFocus.element) else { throw InputError.changed }
+        }
         AXUIElementSetMessagingTimeout(element, 0.5)
         try ensureEditable(element)
         let text = try textValue(element)
@@ -23,7 +60,7 @@ import TranslationCore
         if let ranges = attribute(element, kAXSelectedTextRangesAttribute as String) as? [Any], ranges.count > 1 {
             throw InputError.unsupported
         }
-        let target = try TextTarget(text: text, selection: selection)
+        let target = try TextTarget(text: text, selection: selection, mode: mode)
         var pid: pid_t = 0
         guard AXUIElementGetPid(element, &pid) == .success,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else {

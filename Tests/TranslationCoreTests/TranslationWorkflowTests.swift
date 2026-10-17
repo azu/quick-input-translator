@@ -8,9 +8,9 @@ import Testing
     var replacements = 0
     var cleared = 0
     var captureError: InputError?
-    func capture() throws -> TextTarget {
+    func capture(mode: CaptureMode) throws -> TextTarget {
         if let captureError { throw captureError }
-        return try TextTarget(text: text, selection: selection)
+        return try TextTarget(text: text, selection: selection, mode: mode)
     }
     func replace(_ target: TextTarget, with translation: String) async throws {
         guard target.matches(text: text, selection: selection) else { throw InputError.changed }
@@ -112,4 +112,26 @@ import Testing
         #expect(input.cleared == 1)
         #expect(!workflow.isRunning)
     } catch { Issue.record("Unexpected error: \(error)") }
+}
+
+@Test @MainActor func triggerIsRemovedEvenWhenTranslationMatchesSource() async throws {
+    let input = StubInput(), engine = StubEngine()
+    input.text = "前\n日本語...\n後"
+    input.selection = NSRange(location: 8, length: 0)
+    engine.result = "日本語"
+    let workflow = TranslationWorkflow(engine: engine, input: input)
+    #expect(try await workflow.perform(mode: .triggeredLine(.dots)))
+    #expect(input.text == "前\n日本語\n後")
+    #expect(input.replacements == 1)
+}
+
+@Test @MainActor func failedTranslationKeepsTriggerAndOriginalText() async {
+    let input = StubInput(), engine = StubEngine()
+    input.text = "前\n日本語;;;\n後"
+    input.selection = NSRange(location: 8, length: 0)
+    engine.error = .unsupported
+    let workflow = TranslationWorkflow(engine: engine, input: input)
+    await #expect(throws: InputError.unsupported) { try await workflow.perform(mode: .triggeredLine(.semicolons)) }
+    #expect(input.text == "前\n日本語;;;\n後")
+    #expect(input.replacements == 0)
 }
