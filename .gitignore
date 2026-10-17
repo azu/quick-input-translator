@@ -1,5 +1,5 @@
-/bin/sdev
-/bin/sdev.exe
 .build/
 .swiftpm/
 dist/
+
+/.sdev/
