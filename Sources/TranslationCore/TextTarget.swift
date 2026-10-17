@@ -5,15 +5,15 @@ public enum InputError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidRange: "選択範囲を正しく取得できませんでした。"
-        case .empty: "翻訳する文章がありません。"
-        case .noTrigger: "行末に翻訳の合図がありません。"
-        case .permission: "「準備とテスト」からアクセシビリティ権限を許可してください。"
-        case .unsupported: "この入力欄では文章の取得・選択・貼り付けを確認できません。"
-        case .secure: "パスワード欄は翻訳しません。"
-        case .changed: "入力内容・選択範囲・入力先が変わったため、反映を中止しました。"
-        case .emptyTranslation: "訳文が空だったため、反映しませんでした。"
-        case .unconfirmed: "反映を確認できませんでした。再試行せず、入力欄を確認してください。"
+        case .invalidRange: "Couldn’t read the selected range."
+        case .empty: "There’s no text to translate."
+        case .noTrigger: "There’s no translation trigger at the end of this line."
+        case .permission: "Allow Accessibility access in Settings."
+        case .unsupported: "This input field doesn’t provide the access needed to read, select, and replace text."
+        case .secure: "Password fields can’t be translated."
+        case .changed: "Translation stopped because the text, selection, or input field changed."
+        case .emptyTranslation: "No translation was returned. Your text is unchanged."
+        case .unconfirmed: "Couldn’t confirm the replacement. Check the input field before trying again."
         }
     }
 }
@@ -29,6 +29,7 @@ public struct TextTarget: Equatable, Sendable {
     public let originalSelection: NSRange
     public let replacementRange: NSRange
     public let sourceText: String
+    public let triggerRange: NSRange?
 
     public init(text: String, selection: NSRange, mode: CaptureMode = .selectionOrCurrentLine) throws {
         let string = text as NSString
@@ -65,6 +66,12 @@ public struct TextTarget: Equatable, Sendable {
         self.originalSelection = selection
         self.replacementRange = range
         self.sourceText = source
+        if case .triggeredLine = mode {
+            let markerLength = (contents as NSString).length - (source as NSString).length
+            self.triggerRange = NSRange(location: NSMaxRange(range) - markerLength, length: markerLength)
+        } else {
+            self.triggerRange = nil
+        }
     }
 
     public func matches(text: String, selection: NSRange) -> Bool {

@@ -9,7 +9,7 @@ public enum TranslationTrigger: String, CaseIterable, Sendable {
         character == self.character || (self == .dots && character == "。")
     }
 
-    func source(in line: String) -> String? {
+    public func source(in line: String) -> String? {
         if line.hasSuffix(rawValue) {
             let source = String(line.dropLast(rawValue.count))
             return source.hasSuffix(character) ? nil : source

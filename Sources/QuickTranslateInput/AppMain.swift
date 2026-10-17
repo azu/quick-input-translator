@@ -15,7 +15,7 @@ import TranslationCore
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let model = AppModel()
     private let input = AccessibilityInput()
-    private lazy var workflow = TranslationWorkflow(engine: AppleTranslationEngine(), input: input)
+    private lazy var workflow = TranslationWorkflow(engine: AppleTranslationEngine(languages: { [model] in try model.selectedLanguages() }), input: input)
     private var hotKey: GlobalHotKey?
     private var typingMonitor: TypingMonitor?
     private var statusItem: NSStatusItem?
@@ -23,32 +23,38 @@ import TranslationCore
     private var task: Task<Void, Never>?
     private var pendingTrigger: Task<Void, Never>?
     private var pendingID = UUID()
+    private var permissionWatch: Task<Void, Never>?
     private let hud = TranslationHUD()
-    private let statusMenuItem = NSMenuItem(title: "準備中", action: nil, keyEquivalent: "")
+    private let pairMenuItem = NSMenuItem(title: "Translation", action: nil, keyEquivalent: "")
+    private let statusMenuItem = NSMenuItem(title: "Getting ready", action: nil, keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Diagnostics.event("app.started", "build=\(Bundle.main.object(forInfoDictionaryKey: "QTIBuildID") as? String ?? "unknown") pid=\(getpid())")
         installMainMenu()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "文⇄A"
+        item.button?.image = NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "Quick Translate Input")
         let menu = NSMenu()
         menu.delegate = self
-        menu.addItem(NSMenuItem(title: "日本語 → 英語 · 行末の合図で翻訳", action: nil, keyEquivalent: ""))
+        menu.addItem(pairMenuItem)
         menu.addItem(statusMenuItem)
         menu.addItem(.separator())
-        let setup = NSMenuItem(title: "準備とテスト…", action: #selector(showSetup), keyEquivalent: "")
+        let setup = NSMenuItem(title: "Settings…", action: #selector(showSetup), keyEquivalent: "")
         setup.target = self
         menu.addItem(setup)
-        let quit = NSMenuItem(title: "終了", action: #selector(quit), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
         item.menu = menu
         statusItem = item
         model.onStatusChange = { [weak self] status in
             self?.statusItem?.button?.toolTip = status
-            self?.statusItem?.button?.title = status == "翻訳中…" ? "翻訳中…" : "文⇄A"
+            self?.statusItem?.button?.title = status == "Translating…" ? "…" : ""
         }
         let monitor = TypingMonitor { [weak self] candidate, window in self?.handleTyping(candidate: candidate, localWindow: window) }
         monitor.trigger = model.trigger
+        monitor.onExternalKey = { [weak self] in
+            self?.model.externalInputStatus = "Last input from another app: \(Date().formatted(date: .omitted, time: .standard))"
+        }
         typingMonitor = monitor
         model.onPermissionChange = { [weak self] allowed in
             guard let self else { return }
@@ -59,6 +65,18 @@ import TranslationCore
         model.onTriggerChange = { [weak self] trigger in
             self?.cancelPendingTrigger()
             self?.typingMonitor?.trigger = trigger
+        }
+        model.onLanguageChange = { [weak self] in
+            self?.cancelPendingTrigger()
+            self?.task?.cancel()
+        }
+        model.checkPermission(force: true)
+        permissionWatch = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(1)) }
+                catch { return }
+                self?.model.checkPermission()
+            }
         }
         let hotKey = GlobalHotKey { [weak self] in self?.selectLine() }
         self.hotKey = hotKey
@@ -71,24 +89,31 @@ import TranslationCore
         showSetup()
     }
 
-    func menuWillOpen(_ menu: NSMenu) { statusMenuItem.title = model.status }
+    func menuWillOpen(_ menu: NSMenu) {
+        statusMenuItem.title = model.status
+        pairMenuItem.title = model.pairTitle
+    }
 
     private func installMainMenu() {
         let main = NSMenu()
         let applicationItem = NSMenuItem()
         let application = NSMenu()
-        let quit = NSMenuItem(title: "Quick Translate Inputを終了", action: #selector(quit), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit Quick Translate Input", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
+        let settings = NSMenuItem(title: "Settings…", action: #selector(showSetup), keyEquivalent: ",")
+        settings.target = self
+        application.addItem(settings)
+        application.addItem(.separator())
         application.addItem(quit)
         applicationItem.submenu = application
         main.addItem(applicationItem)
-        let editItem = NSMenuItem(title: "編集", action: nil, keyEquivalent: "")
-        let edit = NSMenu(title: "編集")
-        edit.addItem(withTitle: "取り消す", action: Selector(("undo:")), keyEquivalent: "z")
-        edit.addItem(withTitle: "カット", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        edit.addItem(withTitle: "コピー", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        edit.addItem(withTitle: "ペースト", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        edit.addItem(withTitle: "すべて選択", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editItem.submenu = edit
         main.addItem(editItem)
         NSApp.mainMenu = main
@@ -96,9 +121,9 @@ import TranslationCore
 
     @objc private func showSetup() {
         if window == nil {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 668, height: 560),
-                                  styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-            window.title = "Quick Translate Input — 準備とテスト"
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 690),
+                                  styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.title = "Quick Translate Input Settings"
             window.contentView = NSHostingView(rootView: SetupView(model: model))
             window.isReleasedWhenClosed = false
             window.center()
@@ -116,7 +141,7 @@ import TranslationCore
             do {
                 try await GlobalHotKey.waitForModifiersReleased()
                 try input.selectCurrentLine()
-                model.setStatus("行を選択しました。")
+                model.setStatus("Current line selected.")
             } catch {
                 model.setStatus(error.localizedDescription)
                 NSSound.beep()
@@ -133,15 +158,19 @@ import TranslationCore
 
     private func handleTyping(candidate: Bool, localWindow: NSWindow?) {
         cancelPendingTrigger()
+        if workflow.isRunning { task?.cancel(); return }
         guard candidate, task == nil else { return }
+        Diagnostics.begin()
         let focus: AccessibilityInput.FocusToken
         do { focus = try input.focusToken(localWindow: localWindow) }
         catch {
+            Diagnostics.failure("focus.failed", error)
             model.setStatus(error.localizedDescription)
-            hud.show(error.localizedDescription, working: false)
+            hud.showFailure(error.localizedDescription)
             return
         }
-        hud.show("入力を確認中…", working: true, near: input.bounds(for: focus))
+        model.setStatus("Checking input…")
+        hud.showProgress("Checking input…", near: input.bounds(for: focus))
         let id = UUID()
         pendingID = id
         let trigger = model.trigger
@@ -154,19 +183,32 @@ import TranslationCore
                     guard input.hasFocus(focus) else { if pendingID == id { hud.hide() }; return }
                     input.expectFocus(focus)
                     defer { input.clear() }
-                    _ = try input.capture(mode: .triggeredLine(trigger))
+                    let target = try input.capture(mode: .triggeredLine(trigger))
+                    hud.showProgress("Checking input…", near: input.bounds(for: focus, range: target.triggerRange))
                     try Task.checkCancellation()
                     pendingTrigger = nil
                     translate(focus: focus, trigger: trigger)
                     return
                 } catch InputError.noTrigger {
                     continue
+                } catch is CancellationError {
+                    Diagnostics.event("trigger.cancelled")
+                    return
                 } catch {
-                    if pendingID == id { hud.hide() }
+                    Diagnostics.failure("capture.failed", error)
+                    if pendingID == id {
+                        model.setStatus(error.localizedDescription)
+                        hud.showFailure(error.localizedDescription)
+                    }
                     return
                 }
             }
-            if pendingID == id { hud.hide() }
+            if pendingID == id {
+                let message = "Couldn’t confirm the line-end trigger and cursor position."
+                model.setStatus(message)
+                hud.showFailure(message)
+            }
+            Diagnostics.event("trigger.expired")
         }
     }
 
@@ -177,17 +219,24 @@ import TranslationCore
             do {
                 input.expectFocus(focus)
                 try await workflow.perform(mode: .triggeredLine(trigger)) {
-                    self.model.setStatus("翻訳中…")
-                    self.hud.show("翻訳中…", working: true)
+                    self.model.setStatus("Translating…")
+                    self.hud.showProgress("Translating…")
                 }
-                model.setStatus("翻訳を反映しました。")
-                hud.show("翻訳しました", working: false)
+                model.setStatus("Translation applied.")
+                Diagnostics.event("workflow.succeeded")
+                hud.showSuccess()
+            } catch is CancellationError {
+                Diagnostics.event("workflow.cancelled")
+                model.setStatus("Translation cancelled. Your text is unchanged.")
+                hud.hide()
             } catch InputError.noTrigger {
+                Diagnostics.event("workflow.no_trigger")
                 // A key event may have changed the text before capture began.
                 hud.hide()
             } catch {
+                Diagnostics.failure("workflow.failed", error)
                 model.setStatus(error.localizedDescription)
-                hud.show(error.localizedDescription, working: false)
+                hud.showFailure(error.localizedDescription)
                 NSSound.beep()
             }
         }
@@ -196,6 +245,7 @@ import TranslationCore
     @objc private func quit() { NSApplication.shared.terminate(nil) }
 
     func applicationWillTerminate(_ notification: Notification) {
+        permissionWatch?.cancel()
         task?.cancel()
         cancelPendingTrigger()
         typingMonitor?.stop()

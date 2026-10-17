@@ -1,79 +1,85 @@
 # Quick Translate Input
 
-Macで入力中の行を、行末への合図の入力で翻訳して元の入力欄に戻すツール。
-翻訳エンジンにはAppleのTranslation frameworkを使う。
+Translate the line you’re writing without leaving your app. Type a trigger at the end of the line, and Quick Translate Input replaces it with a translation using Apple’s Translation framework.
 
-[仕様の入口](docs/README.md)から、目的と決定事項を確認できる。
+## Get started
 
-## 使い方
-
-macOS 26以降と、そのOS向けにビルドできるXcodeが必要。
-外部ライブラリや翻訳APIキーは不要。
+Requires macOS 26 or later, a compatible Xcode installation, and an Apple Development signing certificate in your keychain. No third-party dependencies or translation API keys are needed.
 
 ```sh
 bash scripts/build-app.sh
 open "dist/Quick Translate Input.app"
 ```
 
-起動した「準備とテスト」で、アクセシビリティ権限を許可し、「日本語・英語を準備」を実行する。
-言語モデルのダウンロードが必要な場合は、Appleの確認画面で操作する。
-設定後は「状態を再確認」で状態を確認できる。
+The build automatically uses your Apple Development certificate when exactly one is available. Otherwise, set `CODE_SIGN_IDENTITY` to the certificate’s ID. Builds keep the same signing identity, bundle identifier, and app location so Accessibility permission can survive updates. Switching from an older ad-hoc build requires granting permission once again.
 
-「翻訳の合図」で`...`・`;;;`・`:::`から選ぶ。初期値は`...`で、設定は次回起動時にも引き継ぐ。
-入力欄の行末に選んだ合図を入力する。
-合図を除いた現在の行を英語に置き換え、成功すると合図が消える。失敗時は合図を含めて入力を残す。
-画面上の折り返しではなく、改行までを一つの行として扱う。
-送信や投稿は行わない。
+Open **Settings…** from the menu bar icon, or press **Command+,** while the app is active.
 
-Ctrl＋Shift＋Aは現在の行を選択するための補助操作。翻訳は実行しない。
-選択がすでにある場合は、その範囲を維持する。
-翻訳に事前の行選択は不要で、MacのAPIを使ってアプリが行を取得・選択する。
+1. Choose the **From** and **To** languages. Available choices come from Apple’s Translation framework. The source starts as Japanese; the target defaults to your OS language. Choose **System language** to follow your OS preferences, or select a specific language. If no preferred OS language is supported, English is used. Your choices are saved between launches.
+2. Click **Prepare Languages** if a download is required. Apple’s system dialog handles the download. Choose different source and target languages; unsupported pairs aren’t translated.
+3. Allow **Accessibility** access to use the tool in other apps. Permission changes are detected automatically. The built-in test field works without this permission.
+4. Choose a **Line-end trigger**: `...`, `;;;`, or `:::`. The default is `...`.
 
-選んでいない合図、一つか二つの記号、行途中の合図、四つ以上の連続記号では翻訳しない。
-アプリが`...`を`…`に自動変換する場合にも対応する。
-合図が`...`のときは、日本語IMEの`。。。`も受け付ける。
-自アプリのテスト欄では未確定のまま合図を入力でき、Enterキーで確定する操作は不要。
-他アプリの未確定文字の対応は、その入力欄が公開する情報に依存する。
-合図を貼り付けるだけでは翻訳せず、キー入力で判定する。
-入力監視は権限の確認後に開始するので、権限を許可したら「状態を再確認」を押す。
-自アプリのテスト欄は、アクセシビリティ権限なしで試せる。
+The interface and this README are in English. The target language setting only controls translations.
 
-メニューバーの「文⇄A」から状態と準備画面を確認し、アプリを終了できる。
-通常の貼り付け操作なので、対応するアプリではそのアプリの「取り消す」で戻せる。
+## Translate while writing
 
-## 対応する入力欄と制約
+Type the selected trigger at the end of a line. The app translates that line into your chosen target language, removes the trigger, and preserves surrounding lines. It never sends or posts your text.
 
-特定のアプリに限定せず、アクセシビリティAPIで全文と選択範囲を取得・選択できる入力欄を対象にする。
-パスワード欄、読み取り専用の文章、複数の離れた選択範囲には対応しない。
-Chrome、Slack、VS Code、ターミナルなどの個別アプリでの互換性は未確認。すべてのinputでの動作を保証するものではない。
+With `...` selected, Japanese IME input `。。。` and automatic substitution to `…` also work. In the built-in test field, you can type the trigger before confirming Japanese composition; no Enter key is sent. Composition support in other apps depends on the information their input fields expose.
 
-翻訳中に入力やフォーカスが変わった場合は反映を中止する。
-入力欄の近くに確認中・翻訳中・完了または失敗を表示する。処理中はメニューバーにも「翻訳中」と表示する。
-貼り付け直前の確認後に入力先を変える競合は完全には防げないため、操作中は翻訳の完了を待つ。
-反映を確認できないときは自動再試行や巻き戻しを行わない。状態と入力欄を確認する。
+A small spinner appears above the trigger during translation, then briefly becomes a checkmark. Failures display a reason. If the trigger’s position is unavailable, the indicator uses the cursor or pointer area instead.
 
-貼り付けにはクリップボードを一時利用し、反映を確認できたら元の全形式のデータを復元する。
-途中で別のコピーがあった場合は、その内容を上書きしない。
-反映を確認できない場合は復元しないため、別のコピーがなければ訳文が残る。
-クリップボード監視アプリから訳文を読まれる可能性がある。
-合図を判定するためにキー入力を監視するが、原文・訳文・キー入力のログや履歴は保存しない。
+**Control+Shift+A** selects the current logical line without translating it. An existing selection is preserved. You don’t need to select a line before translating.
 
-開発用の署名で生成するローカルアプリ。Developer ID署名と公証による配布は未対応。
-再ビルド後に権限が使えなくなった場合は、システム設定のアクセシビリティでこのアプリを登録し直す。
+The app doesn’t translate one or two trigger characters, four or more repeated trigger characters, triggers in the middle of a line, or triggers inserted by pasting. Wrapped text remains part of the same line until a line break.
 
-## 開発
+Changing the source or target language cancels an in-progress translation. Language models are prepared separately from translation; the app doesn’t start a download while you’re typing in another app.
+
+## Input fields and limitations
+
+The tool uses macOS Accessibility APIs to read text and selection, select the target range, and paste into the focused app. Password fields, read-only content, disconnected selections, and fields that don’t expose the required information aren’t supported.
+
+Translation and replacement have been verified in the built-in test field and a standard multiline input in Arc, including preservation of surrounding lines. Compatibility varies by field. The paragraph-coordinate correction for richer browser editors has automated tests; end-to-end verification of that correction is still pending. Chrome, Slack, and VS Code haven’t been verified.
+
+Terminal support is incomplete. Reading a terminal’s screen text or selection doesn’t establish the boundaries of its editable input buffer, so terminal input can’t currently be treated as an ordinary text field.
+
+If the text, selection, or focused field changes during translation, replacement stops. After requesting a paste, the app checks the full text against the expected result. If it can’t confirm the replacement, it reports a failure without retrying or rolling back. Check the field before trying again. A focus change immediately after the final check remains a possible race, so let the operation finish before switching fields.
+
+Pasting temporarily places the translation on the clipboard. After successful replacement, the app restores the original clipboard formats unless you copied something else in the meantime. If replacement can’t be confirmed, the translation remains on the clipboard unless another copy replaced it. Clipboard managers may observe this temporary content. Translation in the built-in test field doesn’t use the clipboard.
+
+## Diagnostics and privacy
+
+Expand **Diagnostics** in Settings to check shortcut registration, trigger monitoring, the time of the last input event from another app, and Secure Input status. Secure Input can block trigger detection in other apps.
+
+To inspect diagnostic events from the last 15 minutes:
+
+```sh
+bash scripts/logs.sh
+# Follow events while reproducing a problem:
+bash scripts/logs.sh --stream
+```
+
+Logs record operation IDs, processing stages, app identifiers, numeric ranges, OS return codes, and whether replacement matched the expected result. Source text, translations, clipboard contents, and keystroke history aren’t logged or saved.
+
+The app is signed for local development. Developer ID distribution and notarization aren’t set up. The build refuses to silently switch to ad-hoc signing, and preserves the existing app if signing fails.
+
+## Development
 
 ```sh
 swift test
 swift build
+./bin/sdev lint
 ```
 
-各合図の判定、翻訳範囲の計算、失敗・重複実行・翻訳中の入力変更・キャンセル時の制御を自動テストする。
-言語モデルの準備、他アプリへのアクセス、ショートカット、貼り付けの確認はGUI環境での検証が必要。
+Tests cover trigger detection, translation ranges, language selection and persistence, replacement guards, clipboard restoration, and cancellation. Model downloads, Accessibility permission, and compatibility with external input fields also need GUI verification.
 
-準備済みのモデルで実際の翻訳を確認する場合は、物理Macで次を実行する。
-通常のテストではこの確認をスキップする。モデルのダウンロードは行わない。
+To test real Japanese-to-English translation on a physical Mac with both language models installed:
 
 ```sh
 RUN_TRANSLATION_INTEGRATION=1 swift test --filter installedJapaneseEnglishModelTranslates
 ```
+
+This opt-in test doesn’t download models. It’s skipped in normal test runs.
+
+Start with the [project documentation](docs/README.md) for the product, requirements, and design. The design notes are currently in Japanese.

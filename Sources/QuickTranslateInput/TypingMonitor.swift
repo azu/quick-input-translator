@@ -6,6 +6,8 @@ import TranslationCore
     private var local: Any?
     private var global: Any?
     private var sequence = TriggerSequence()
+    private var lastExternalReport = Date.distantPast
+    var onExternalKey: (() -> Void)?
     var trigger: TranslationTrigger = .dots {
         didSet { sequence = TriggerSequence() }
     }
@@ -44,6 +46,10 @@ import TranslationCore
     }
 
     private func observe(_ event: NSEvent, localWindow: NSWindow?) {
+        if localWindow == nil, event.type == .keyDown, Date().timeIntervalSince(lastExternalReport) >= 1 {
+            lastExternalReport = Date()
+            onExternalKey?()
+        }
         let forbidden: NSEvent.ModifierFlags = [.command, .control, .option]
         let isTriggerCharacter = event.type == .keyDown && !event.isARepeat
             && event.modifierFlags.intersection(forbidden).isEmpty && trigger.accepts(event.characters)

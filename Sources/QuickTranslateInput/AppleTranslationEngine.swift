@@ -3,20 +3,38 @@ import Translation
 import TranslationCore
 
 @MainActor final class AppleTranslationEngine: TranslationEngine {
-    static let source = Locale.Language(identifier: "ja")
-    static let target = Locale.Language(identifier: "en")
+    private let languages: () throws -> TranslationLanguages
+
+    init(languages: @escaping () throws -> TranslationLanguages = { .japaneseToEnglish }) {
+        self.languages = languages
+    }
 
     func translate(_ text: String) async throws -> String {
-        let status = await LanguageAvailability().status(from: Self.source, to: Self.target)
-        guard status == .installed else { throw ModelError.notPrepared }
-        let session = TranslationSession(installedSource: Self.source, target: Self.target)
-        return try await session.translate(text).targetText
+        let pair = try languages()
+        guard !pair.source.isEquivalent(to: pair.target) else { throw ModelError.sameLanguage }
+        Diagnostics.event("translation.started", "source_length=\(text.utf16.count)")
+        let status = await LanguageAvailability().status(from: pair.source, to: pair.target)
+        try Task.checkCancellation()
+        switch status {
+        case .installed: break
+        case .supported: throw ModelError.notPrepared
+        case .unsupported: throw ModelError.unsupported
+        @unknown default: throw ModelError.unsupported
+        }
+        let session = TranslationSession(installedSource: pair.source, target: pair.target)
+        let result = try await session.translate(text).targetText
+        Diagnostics.event("translation.finished", "result_length=\(result.utf16.count)")
+        return result
     }
 }
 
-enum ModelError: LocalizedError {
-    case notPrepared
+enum ModelError: LocalizedError, Equatable {
+    case notPrepared, unsupported, sameLanguage
     var errorDescription: String? {
-        "「準備とテスト」で日本語・英語の言語モデルを準備してください。"
+        switch self {
+        case .notPrepared: "Open Settings and prepare the selected translation languages."
+        case .unsupported: "This language pair is unavailable. Choose another pair in Settings."
+        case .sameLanguage: "Choose different source and target languages."
+        }
     }
 }

@@ -58,8 +58,8 @@ enum HotKeyError: LocalizedError {
     case registration(OSStatus), keysHeld
     var errorDescription: String? {
         switch self {
-        case .registration(let status): "Ctrl＋Shift＋Aを登録できませんでした（\(status)）。他のアプリのショートカット設定を確認してください。"
-        case .keysHeld: "キーを離してから、もう一度Ctrl＋Shift＋Aを押してください。"
+        case .registration(let status): "Couldn’t register Control+Shift+A (\(status)). Check for a shortcut conflict with another app."
+        case .keysHeld: "Release the keys, then press Control+Shift+A again."
         }
     }
 }

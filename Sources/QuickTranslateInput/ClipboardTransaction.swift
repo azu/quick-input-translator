@@ -49,9 +49,9 @@ enum ClipboardError: LocalizedError {
     case readFailed, writeFailed, changed
     var errorDescription: String? {
         switch self {
-        case .readFailed: "クリップボードの元の内容を保存できないため、貼り付けを中止しました。"
-        case .writeFailed: "クリップボードに訳文を書き込めませんでした。"
-        case .changed: "クリップボードが変わったため、貼り付けを中止しました。"
+        case .readFailed: "Pasting stopped because the original clipboard contents couldn’t be preserved."
+        case .writeFailed: "Couldn’t copy the translation to the clipboard."
+        case .changed: "Pasting stopped because the clipboard changed."
         }
     }
 }
