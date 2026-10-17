@@ -55,3 +55,10 @@ swift build
 
 翻訳範囲の計算と、失敗・重複実行・翻訳中の入力変更・キャンセル時の制御を自動テストする。
 言語モデルの準備、他アプリへのアクセス、ショートカット、貼り付けの確認はGUI環境での検証が必要。
+
+準備済みのモデルで実際の翻訳を確認する場合は、物理Macで次を実行する。
+通常のテストではこの確認をスキップする。モデルのダウンロードは行わない。
+
+```sh
+RUN_TRANSLATION_INTEGRATION=1 swift test --filter installedJapaneseEnglishModelTranslates
+```
