@@ -109,6 +109,7 @@ Local builds use your Apple Development certificate and refuse to silently switc
 swift test
 swift build
 bash scripts/test-version.sh
+bash scripts/test-release-notes.sh
 ./bin/sdev lint
 ```
 
@@ -131,6 +132,8 @@ Start with the [project documentation](docs/README.md) for the product, requirem
 Run **Create Release PR** in GitHub Actions on `main` and choose `patch`, `minor`, or `major` (default: `patch`). The workflow calculates the next version from `VERSION`, changes only that file, and opens a `release/v…` PR. Review and merge that PR to create the tag, run tests on macOS 26, and publish the Apple Silicon ZIP and SHA-256 checksum. Enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** if PR creation is disabled.
 
 The increments follow [Semantic Versioning](https://semver.org/): `patch` for compatible fixes, `minor` for compatible additions, and `major` for incompatible changes. Starting from `1.2.3`, they produce `1.2.4`, `1.3.0`, and `2.0.0` respectively. The same choices work locally with `bash scripts/version.sh --bump patch`. Releases use the normal three-part version format; prerelease labels and build metadata aren’t supported.
+
+The release PR body starts with GitHub’s automatically generated release notes. Review and edit that body before merging: the published release uses the complete PR body unchanged. This follows the [release-note workflow described on efcl.info](https://efcl.info/2023/03/11/auto-release-note/). Tag-triggered releases and manual retries also reuse the body of the matching merged release PR. Only releases without a matching PR generate new notes; an empty PR body or a failed API request stops publication.
 
 You can also release the current version by pushing its matching tag, including the first release:
 

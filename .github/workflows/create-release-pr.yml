@@ -28,7 +28,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
@@ -42,6 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           NEW_VERSION="$(bash scripts/version.sh --bump "$BUMP")"
+          bash scripts/release-notes.sh generate "v$NEW_VERSION" "$(git rev-parse HEAD)" "$RUNNER_TEMP/release-body.md"
           branch="release/v$NEW_VERSION"
           git switch -c "$branch"
           git config user.name 'github-actions[bot]'
@@ -50,5 +51,4 @@ jobs:
           git commit -m "chore: release v$NEW_VERSION"
           gh auth setup-git
           git push origin "$branch"
-          printf 'Release version %s. Merging this PR builds and publishes the release.\n' "$NEW_VERSION" > "$RUNNER_TEMP/release-body.md"
           gh pr create --base main --head "$branch" --title "Release v$NEW_VERSION" --body-file "$RUNNER_TEMP/release-body.md"
