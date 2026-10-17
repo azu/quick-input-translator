@@ -2,6 +2,8 @@
 
 Translate the line or entire input field you’re writing without leaving your app. Type a trigger at the end of the line or field, and Quick Input Translator replaces it with a translation using Apple’s Translation framework.
 
+![Quick Input Translator settings with language and translation trigger options](docs/images/settings.png)
+
 ## Install
 
 Requires an Apple Silicon Mac running macOS 26 or later. Release downloads are ad-hoc signed and aren’t notarized. The commands below verify the download checksum and remove the quarantine attribute from this app so it can be opened. Xcode and an Apple Development certificate aren’t needed for a release download.
