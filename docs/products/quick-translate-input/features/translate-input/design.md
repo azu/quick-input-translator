@@ -74,7 +74,9 @@ AppKitでメニューと準備画面を管理し、AppleのTranslation framework
 上から言語・合図、アクセス権限、テスト欄の順に並べ、キー受信・監視登録・セキュア入力の詳細はDisclosureGroup内へ置く。
 共通の余白、標準Picker・Button、システムの配色を使い、状態は文字でも示す。
 
-合図には「Line-end trigger」と「Whole-input trigger」のPickerを並べ、どちらも`@@@`・`:::`・`;;;`・`...`から選択する。
+合図には「Line-end trigger」と「Whole-input trigger」の選択欄を並べ、どちらも`@@@`・`:::`・`;;;`・`...`から選択する。
+この二つの選択欄は、NSSegmentedControlをNSViewRepresentableで表示する。
+SwiftUIのsegmented Pickerでは個々の候補の無効化が実画面へ反映されなかったため、AppKitのsetEnabled(_:forSegment:)で他方が使用中の候補を無効にする。
 各欄には、選択した合図と翻訳範囲の説明を添える。
 UIとエラーは英語、READMEも英語とし、Command＋CommaでSettingsを開く。
 [Appleの設定画面指針](https://developer.apple.com/design/human-interface-guidelines/settings)と[配置指針](https://developer.apple.com/design/human-interface-guidelines/layout)に基づく。
@@ -187,6 +189,11 @@ TranslationSession(installedSource:target:)にはインストール済みのモ�
 
 翻訳後にフォーカス・全文・選択範囲を再確認し、対象範囲を選択する。
 他アプリでは表示上の位置から選択APIの位置へ逆変換し、AXSelectedTextが置換元と一致することも確認する。
+Chromiumの段落を含む選択では、AXSelectedTextにも表示用の改行が含まれない場合がある。
+[Chromiumの実装](https://chromium.googlesource.com/chromium/src/+/91b8a39168581465b04ca89ef0ba2a9e17e7c35e/ui/accessibility/platform/browser_accessibility_cocoa.mm)でも、全文のAXValueと選択文字列のAXSelectedTextは別の方法で取得している。
+その場合は、取得時にAXStringForRangeと照合して作った位置の対応を使い、選択API側の文字列とも比較する。
+表示上にだけ追加されたと確認済みのLFだけを差として認め、実際の改行や他の文字に違いがあれば中止する。
+この確認は行翻訳と全体翻訳の両方に適用する。
 全体翻訳でも全文の範囲を安全に選択できることを確認し、確認できなければ中止する。
 
 選択範囲の変更が他アプリからの読み取りへ反映されるまで、最大500ミリ秒待つ。
@@ -444,8 +451,8 @@ Developer ID署名と公証による配布は対象外とする。
 
 ### 全体翻訳と取り消しの確認
 
-全体翻訳の置換と、一回の取り消しで翻訳前の全文に戻ることは実機で未確認。
-利用する入力欄ごとに両方を確認してから対応済みとする。
+他アプリの全体翻訳と取り消しの対応は、利用する入力欄ごとに確認する。
+置換と、一回の取り消しで翻訳前の全文に戻ることの両方を確認してから対応済みとする。
 通常の貼り付け経路を使うことだけで、取り消しも動作すると判断しない。
 
 ### アプリごとの互換性

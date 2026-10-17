@@ -1,6 +1,6 @@
 # Quick Translate Input
 
-Translate the line you’re writing without leaving your app. Type a trigger at the end of the line, and Quick Translate Input replaces it with a translation using Apple’s Translation framework.
+Translate the line or entire input field you’re writing without leaving your app. Type a trigger at the end of the line or field, and Quick Translate Input replaces it with a translation using Apple’s Translation framework.
 
 ## Get started
 
@@ -18,13 +18,17 @@ Open **Settings…** from the menu bar icon, or press **Command+,** while the ap
 1. Choose the **From** and **To** languages. Available choices come from Apple’s Translation framework. The source starts as Japanese; the target defaults to your OS language. Choose **System language** to follow your OS preferences, or select a specific language. If no preferred OS language is supported, English is used. Your choices are saved between launches.
 2. Click **Prepare Languages** if a download is required. Apple’s system dialog handles the download. Choose different source and target languages; unsupported pairs aren’t translated.
 3. Allow **Accessibility** access to use the tool in other apps. Permission changes are detected automatically. The built-in test field works without this permission.
-4. Choose a **Line-end trigger**: `...`, `;;;`, or `:::`. The default is `...`.
+4. Choose a **Line-end trigger** and a **Whole-input trigger** from `...`, `;;;`, `:::`, and `@@@`. They must be different. A new setup defaults to `...` for a line and `:::` for the whole field. An existing line trigger is preserved; if it is already `:::`, the new whole-input trigger starts as `@@@`.
 
 The interface and this README are in English. The target language setting only controls translations.
 
 ## Translate while writing
 
 Type the selected trigger at the end of a line. The app translates that line into your chosen target language, removes the trigger, and preserves surrounding lines. It never sends or posts your text.
+
+To translate a multiline draft, type the **Whole-input trigger** at the very end of the input field. The app passes the entire draft to the translation engine in one request, removes only the final trigger, and replaces the field in place. A whole-input trigger in an earlier line doesn’t start a translation. You don’t need to select text or switch modes.
+
+Use the input app’s **Command+Z** immediately after replacement to undo it. Undo should restore the original field, including the trigger, as one edit. This is tested in the built-in editor; Undo behavior in external apps needs verification for each input field.
 
 With `...` selected, Japanese IME input `。。。` and automatic substitution to `…` also work. In the built-in test field, you can type the trigger before confirming Japanese composition; no Enter key is sent. Composition support in other apps depends on the information their input fields expose.
 
@@ -34,13 +38,13 @@ A small spinner appears above the trigger during translation, then briefly becom
 
 The app doesn’t translate one or two trigger characters, four or more repeated trigger characters, triggers in the middle of a line, or triggers inserted by pasting. Wrapped text remains part of the same line until a line break.
 
-Changing the source or target language cancels an in-progress translation. Language models are prepared separately from translation; the app doesn’t start a download while you’re typing in another app.
+Changing the source language, target language, or either trigger cancels an in-progress translation. Language models are prepared separately from translation; the app doesn’t start a download while you’re typing in another app.
 
 ## Input fields and limitations
 
 The tool uses macOS Accessibility APIs to read text and selection, select the target range, and paste into the focused app. Password fields, read-only content, disconnected selections, and fields that don’t expose the required information aren’t supported.
 
-Translation and replacement have been verified in the built-in test field and a standard multiline input in Arc, including preservation of surrounding lines. Compatibility varies by field. The paragraph-coordinate correction for richer browser editors has automated tests; end-to-end verification of that correction is still pending. Chrome, Slack, and VS Code haven’t been verified.
+Line translation and replacement have been verified in the built-in test field and a standard multiline input in Arc, including preservation of surrounding lines. Whole-input translation is covered by tests using the real Apple model and native text-view replacement, with a separate native Undo test. Whole-input replacement and Undo in external apps still need end-to-end verification. The paragraph-coordinate correction for richer browser editors has automated tests; end-to-end verification of that correction is still pending. Chrome, Slack, and VS Code haven’t been verified.
 
 Terminal support is incomplete. Reading a terminal’s screen text or selection doesn’t establish the boundaries of its editable input buffer, so terminal input can’t currently be treated as an ordinary text field.
 
@@ -72,7 +76,7 @@ swift build
 ./bin/sdev lint
 ```
 
-Tests cover trigger detection, translation ranges, language selection and persistence, replacement guards, clipboard restoration, and cancellation. Model downloads, Accessibility permission, and compatibility with external input fields also need GUI verification.
+Tests cover both trigger scopes, whole-field ranges and Japanese composition, independent trigger settings and migration, native-editor Undo, language selection and persistence, replacement guards, clipboard restoration, and cancellation. Model downloads, Accessibility permission, and compatibility with external input fields also need GUI verification.
 
 To test real Japanese-to-English translation on a physical Mac with both language models installed:
 
@@ -80,6 +84,6 @@ To test real Japanese-to-English translation on a physical Mac with both languag
 RUN_TRANSLATION_INTEGRATION=1 swift test --filter installedJapaneseEnglishModelTranslates
 ```
 
-This opt-in test doesn’t download models. It’s skipped in normal test runs.
+These opt-in tests check single-string translation and whole-field translation followed by native-editor replacement. They don’t download models and are skipped in normal test runs.
 
 Start with the [project documentation](docs/README.md) for the product, requirements, and design. The design notes are currently in Japanese.

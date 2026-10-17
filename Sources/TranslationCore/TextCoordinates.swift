@@ -4,6 +4,8 @@ import Foundation
 /// Chromium contenteditable can add paragraph separators to AXValue only.
 public struct TextCoordinates: Equatable, Sendable {
     private let offsets: [Int]
+    private let indexedText: String
+    private let displayedText: String
     public let indexedLength: Int
     public var isIdentity: Bool { offsets.count == indexedLength + 1 }
 
@@ -20,7 +22,17 @@ public struct TextCoordinates: Equatable, Sendable {
         }
         guard index == native.count else { throw InputError.unsupported }
         self.offsets = offsets
+        self.indexedText = indexed
+        self.displayedText = displayed
         self.indexedLength = native.count
+    }
+
+    /// Selection text may omit only paragraph separators already verified by
+    /// the AXValue / AXStringForRange mapping. Explicit line breaks stay intact.
+    public func matchesSelectedText(_ selected: String, range: NSRange) throws -> Bool {
+        let nativeRange = try indexedRange(for: range)
+        return selected == (displayedText as NSString).substring(with: range)
+            || selected == (indexedText as NSString).substring(with: nativeRange)
     }
 
     public func indexedRange(for range: NSRange) throws -> NSRange {

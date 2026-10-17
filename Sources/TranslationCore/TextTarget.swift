@@ -7,7 +7,7 @@ public enum InputError: LocalizedError, Equatable {
         switch self {
         case .invalidRange: "Couldn’t read the selected range."
         case .empty: "There’s no text to translate."
-        case .noTrigger: "There’s no translation trigger at the end of this line."
+        case .noTrigger: "There’s no translation trigger at the end of the target text."
         case .permission: "Allow Accessibility access in Settings."
         case .unsupported: "This input field doesn’t provide the access needed to read, select, and replace text."
         case .secure: "Password fields can’t be translated."
@@ -21,6 +21,19 @@ public enum InputError: LocalizedError, Equatable {
 public enum CaptureMode: Equatable, Sendable {
     case selectionOrCurrentLine
     case triggeredLine(TranslationTrigger)
+    case triggeredField(TranslationTrigger)
+
+    public var trigger: TranslationTrigger? {
+        switch self {
+        case .selectionOrCurrentLine: nil
+        case .triggeredLine(let trigger), .triggeredField(let trigger): trigger
+        }
+    }
+
+    public var isWholeInput: Bool {
+        if case .triggeredField = self { return true }
+        return false
+    }
 }
 
 /// AX and NSString both use UTF-16 offsets. Never convert these offsets to String.count.
@@ -41,7 +54,9 @@ public struct TextTarget: Equatable, Sendable {
               Range(selection, in: text) != nil else { throw InputError.invalidRange }
 
         let range: NSRange
-        if mode == .selectionOrCurrentLine && selection.length > 0 {
+        if mode.isWholeInput {
+            range = NSRange(location: 0, length: string.length)
+        } else if mode == .selectionOrCurrentLine && selection.length > 0 {
             range = selection
         } else {
             var start = 0, end = 0, contentsEnd = 0
@@ -51,7 +66,7 @@ public struct TextTarget: Equatable, Sendable {
         }
         let contents = string.substring(with: range)
         let source: String
-        if case .triggeredLine(let trigger) = mode {
+        if let trigger = mode.trigger {
             // IMEs may select the active composition at the end of the line.
             guard NSMaxRange(selection) == NSMaxRange(range) else { throw InputError.noTrigger }
             guard let beforeMarker = trigger.source(in: contents) else { throw InputError.noTrigger }
@@ -66,7 +81,7 @@ public struct TextTarget: Equatable, Sendable {
         self.originalSelection = selection
         self.replacementRange = range
         self.sourceText = source
-        if case .triggeredLine = mode {
+        if mode.trigger != nil {
             let markerLength = (contents as NSString).length - (source as NSString).length
             self.triggerRange = NSRange(location: NSMaxRange(range) - markerLength, length: markerLength)
         } else {

@@ -5,15 +5,15 @@ import TranslationCore
 @MainActor final class TypingMonitor {
     private var local: Any?
     private var global: Any?
-    private var sequence = TriggerSequence()
+    private var detector = TranslationTriggerDetector()
     private var lastExternalReport = Date.distantPast
     var onExternalKey: (() -> Void)?
-    var trigger: TranslationTrigger = .dots {
-        didSet { sequence = TriggerSequence() }
+    func configure(line: TranslationTrigger, wholeInput: TranslationTrigger) {
+        detector = TranslationTriggerDetector(line: line, wholeInput: wholeInput)
     }
-    private let onEvent: @MainActor (Bool, NSWindow?) -> Void
+    private let onEvent: @MainActor (CaptureMode?, NSWindow?) -> Void
 
-    init(onEvent: @escaping @MainActor (Bool, NSWindow?) -> Void) { self.onEvent = onEvent }
+    init(onEvent: @escaping @MainActor (CaptureMode?, NSWindow?) -> Void) { self.onEvent = onEvent }
 
     var isRunning: Bool { local != nil && global != nil }
 
@@ -42,7 +42,7 @@ import TranslationCore
         if let global { NSEvent.removeMonitor(global) }
         local = nil
         global = nil
-        sequence = TriggerSequence()
+        detector.reset()
     }
 
     private func observe(_ event: NSEvent, localWindow: NSWindow?) {
@@ -51,8 +51,8 @@ import TranslationCore
             onExternalKey?()
         }
         let forbidden: NSEvent.ModifierFlags = [.command, .control, .option]
-        let isTriggerCharacter = event.type == .keyDown && !event.isARepeat
-            && event.modifierFlags.intersection(forbidden).isEmpty && trigger.accepts(event.characters)
-        onEvent(sequence.observe(isTriggerCharacter: isTriggerCharacter), localWindow)
+        let isTyping = event.type == .keyDown && !event.isARepeat
+            && event.modifierFlags.intersection(forbidden).isEmpty
+        onEvent(detector.observe(isTyping ? event.characters : nil), localWindow)
     }
 }

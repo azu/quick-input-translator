@@ -5,7 +5,7 @@ import Carbon
 @preconcurrency import ApplicationServices
 
 @MainActor final class AppModel: ObservableObject {
-    @Published var status = "Type a trigger at the end of a line to translate."
+    @Published var status = "Type a line-end or whole-input trigger to translate."
     @Published var shortcutReady = false
     @Published var modelStatus = "Checking languages…"
     @Published var languages: [Locale.Language] = []
@@ -27,23 +27,38 @@ import Carbon
             defaults.set(targetID, forKey: "translationTarget"); languageChanged()
         }
     }
-    @Published var trigger: TranslationTrigger {
-        didSet {
-            defaults.set(trigger.rawValue, forKey: "translationTrigger")
-            onTriggerChange?(trigger)
-        }
-    }
+    @Published private(set) var trigger: TranslationTrigger
+    @Published private(set) var wholeInputTrigger: TranslationTrigger
     private let defaults: UserDefaults
     var onStatusChange: ((String) -> Void)?
     var onPermissionChange: ((Bool) -> Void)?
-    var onTriggerChange: ((TranslationTrigger) -> Void)?
+    var onTriggerChange: (() -> Void)?
     var onLanguageChange: (() -> Void)?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         sourceID = defaults.string(forKey: "translationSource") ?? "ja"
         targetID = defaults.string(forKey: "translationTarget") ?? "system"
-        trigger = TranslationTrigger(rawValue: defaults.string(forKey: "translationTrigger") ?? "") ?? .dots
+        let line = TranslationTrigger(rawValue: defaults.string(forKey: "translationTrigger") ?? "") ?? .dots
+        let whole = TranslationTrigger(rawValue: defaults.string(forKey: "wholeInputTranslationTrigger") ?? "")
+        trigger = line
+        wholeInputTrigger = whole.flatMap { $0 != line ? $0 : nil } ?? (line == .colons ? .atSigns : .colons)
+        defaults.set(trigger.rawValue, forKey: "translationTrigger")
+        defaults.set(wholeInputTrigger.rawValue, forKey: "wholeInputTranslationTrigger")
+    }
+
+    func setLineTrigger(_ value: TranslationTrigger) {
+        guard value != trigger, value != wholeInputTrigger else { return }
+        trigger = value
+        defaults.set(value.rawValue, forKey: "translationTrigger")
+        onTriggerChange?()
+    }
+
+    func setWholeInputTrigger(_ value: TranslationTrigger) {
+        guard value != wholeInputTrigger, value != trigger else { return }
+        wholeInputTrigger = value
+        defaults.set(value.rawValue, forKey: "wholeInputTranslationTrigger")
+        onTriggerChange?()
     }
 
     var selectionID: [String] { [sourceID, targetID] }
@@ -162,19 +177,21 @@ struct SetupView: View {
                         }
                     }
                     Divider().padding(.vertical, 4)
-                    HStack {
-                        Text("Line-end trigger")
-                        Spacer()
-                        Picker("Line-end trigger", selection: $model.trigger) {
-                            ForEach(TranslationTrigger.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .frame(width: 200)
-                    }
+                    triggerPicker("Line-end trigger",
+                                  selection: Binding(get: { model.trigger }, set: { model.setLineTrigger($0) }),
+                                  unavailable: model.wholeInputTrigger)
                     Text("Type \(model.trigger.rawValue) at the end of a line. Only that line is replaced.")
                         .font(.callout).foregroundStyle(.secondary)
                     if model.trigger == .dots {
+                        Text("Also works with 。。。 during Japanese input.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    triggerPicker("Whole-input trigger",
+                                  selection: Binding(get: { model.wholeInputTrigger }, set: { model.setWholeInputTrigger($0) }),
+                                  unavailable: model.trigger)
+                    Text("Type \(model.wholeInputTrigger.rawValue) at the end of the input field. The entire field is replaced.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    if model.wholeInputTrigger == .dots {
                         Text("Also works with 。。。 during Japanese input.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -290,6 +307,16 @@ struct SetupView: View {
             }
             .labelsHidden().frame(maxWidth: .infinity)
             .accessibilityLabel(title == "From" ? "Source language" : "Target language")
+        }
+    }
+
+    private func triggerPicker(_ title: String, selection: Binding<TranslationTrigger>,
+                               unavailable: TranslationTrigger) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TriggerPicker(selection: selection, unavailable: unavailable, label: title)
+            .frame(width: 240)
         }
     }
 

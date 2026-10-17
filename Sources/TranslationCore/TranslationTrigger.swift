@@ -2,6 +2,7 @@ public enum TranslationTrigger: String, CaseIterable, Sendable {
     case dots = "..."
     case semicolons = ";;;"
     case colons = ":::"
+    case atSigns = "@@@"
 
     public var character: String { String(rawValue.prefix(1)) }
 

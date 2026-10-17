@@ -6,7 +6,7 @@ import TranslationCore
     static func capture(_ view: NSTextView, mode: CaptureMode) throws -> TextTarget {
         guard view.isEditable, !(view.delegate is NSSecureTextField) else { throw InputError.unsupported }
         let target = try TextTarget(text: view.string, selection: view.selectedRange(), mode: mode)
-        if case .triggeredLine = mode, view.hasMarkedText() {
+        if mode.trigger != nil, view.hasMarkedText() {
             // Commit through the input client, never by sending Return to an arbitrary app.
             view.unmarkText()
             view.inputContext?.discardMarkedText()
@@ -21,11 +21,14 @@ import TranslationCore
         guard target.matches(text: view.string, selection: view.selectedRange()), !view.hasMarkedText() else {
             throw InputError.changed
         }
-        guard view.isEditable, let storage = view.textStorage,
-              view.shouldChangeText(in: target.replacementRange, replacementString: translation) else {
+        guard view.isEditable, let storage = view.textStorage else {
             throw InputError.unsupported
         }
+        view.allowsUndo = true
         view.breakUndoCoalescing()
+        guard view.shouldChangeText(in: target.replacementRange, replacementString: translation) else {
+            throw InputError.unsupported
+        }
         storage.replaceCharacters(in: target.replacementRange, with: translation)
         view.didChangeText()
         view.setSelectedRange(NSRange(location: target.replacementRange.location + (translation as NSString).length, length: 0))

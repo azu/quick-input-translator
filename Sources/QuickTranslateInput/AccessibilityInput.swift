@@ -85,7 +85,10 @@ enum ExternalInputError: LocalizedError {
             let candidates = try mapping.displayedRanges(for: nativeSelection)
             let selectedText = attribute(element, kAXSelectedTextAttribute) as? String
             let matching = candidates.compactMap { range -> TextTarget? in
-                if range.length > 0, selectedText != (text as NSString).substring(with: range) { return nil }
+                if range.length > 0 {
+                    guard let selectedText,
+                          (try? mapping.matchesSelectedText(selectedText, range: range)) == true else { return nil }
+                }
                 return try? TextTarget(text: text, selection: range, mode: mode)
             }
             if matching.count == 1 {
@@ -95,12 +98,16 @@ enum ExternalInputError: LocalizedError {
             guard matching.isEmpty else { throw InputError.unsupported }
             guard candidates.count == 1 || mode != .selectionOrCurrentLine else { throw InputError.unsupported }
             let selection = candidates[0]
-            if selection.length > 0, selectedText != (text as NSString).substring(with: selection) { throw InputError.unsupported }
+            if selection.length > 0 {
+                guard let selectedText,
+                      try mapping.matchesSelectedText(selectedText, range: selection) else { throw InputError.unsupported }
+            }
             do {
                 target = try TextTarget(text: text, selection: selection, mode: mode)
             } catch InputError.noTrigger {
-                if case .triggeredLine(let trigger) = mode {
-                    Diagnostics.captureRejected(text: text, selection: selection, trigger: trigger)
+                if let trigger = mode.trigger {
+                    Diagnostics.captureRejected(text: text, selection: selection, trigger: trigger,
+                                                wholeInput: mode.isWholeInput)
                 }
                 throw InputError.noTrigger
             }
@@ -136,8 +143,12 @@ enum ExternalInputError: LocalizedError {
             }
             let selected = attribute(element, kAXSelectedTextAttribute) as? String
             let expectedSelection = (target.fullText as NSString).substring(with: target.replacementRange)
-            Diagnostics.event("selection.confirmed", "selected_text_available=\(selected != nil) selected_text_matches=\(selected == expectedSelection)")
-            if let selected { guard selected == expectedSelection else { throw InputError.changed } }
+            let matches = try selected.map {
+                try saved.coordinates?.matchesSelectedText($0, range: target.replacementRange)
+                    ?? ($0 == expectedSelection)
+            } ?? false
+            Diagnostics.event("selection.confirmed", "selected_text_available=\(selected != nil) selected_text_matches=\(matches) selected_length=\(selected?.utf16.count ?? -1) expected_length=\(expectedSelection.utf16.count) indexed_length=\(saved.coordinates?.indexedLength ?? -1)")
+            if selected != nil { guard matches else { throw InputError.changed } }
             else if saved.coordinates?.isIdentity == false { throw InputError.unsupported }
             try Task.checkCancellation()
             guard hasFocus(saved.focus), try textValue(saved.focus) == target.fullText,

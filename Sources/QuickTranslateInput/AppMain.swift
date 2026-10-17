@@ -51,7 +51,7 @@ import TranslationCore
             self?.statusItem?.button?.title = status == "Translating…" ? "…" : ""
         }
         let monitor = TypingMonitor { [weak self] candidate, window in self?.handleTyping(candidate: candidate, localWindow: window) }
-        monitor.trigger = model.trigger
+        monitor.configure(line: model.trigger, wholeInput: model.wholeInputTrigger)
         monitor.onExternalKey = { [weak self] in
             self?.model.externalInputStatus = "Last input from another app: \(Date().formatted(date: .omitted, time: .standard))"
         }
@@ -62,9 +62,11 @@ import TranslationCore
             if !allowed { self.cancelPendingTrigger() }
             self.model.monitorReady = self.typingMonitor?.isRunning == true
         }
-        model.onTriggerChange = { [weak self] trigger in
-            self?.cancelPendingTrigger()
-            self?.typingMonitor?.trigger = trigger
+        model.onTriggerChange = { [weak self] in
+            guard let self else { return }
+            self.cancelPendingTrigger()
+            self.task?.cancel()
+            self.typingMonitor?.configure(line: self.model.trigger, wholeInput: self.model.wholeInputTrigger)
         }
         model.onLanguageChange = { [weak self] in
             self?.cancelPendingTrigger()
@@ -156,10 +158,10 @@ import TranslationCore
         pendingTrigger = nil
     }
 
-    private func handleTyping(candidate: Bool, localWindow: NSWindow?) {
+    private func handleTyping(candidate: CaptureMode?, localWindow: NSWindow?) {
         cancelPendingTrigger()
         if workflow.isRunning { task?.cancel(); return }
-        guard candidate, task == nil else { return }
+        guard let mode = candidate, task == nil else { return }
         Diagnostics.begin()
         let focus: AccessibilityInput.FocusToken
         do { focus = try input.focusToken(localWindow: localWindow) }
@@ -173,7 +175,6 @@ import TranslationCore
         hud.showProgress("Checking input…", near: input.bounds(for: focus))
         let id = UUID()
         pendingID = id
-        let trigger = model.trigger
         pendingTrigger = Task { @MainActor in
             defer { if pendingID == id { pendingTrigger = nil } }
             // Input dispatch in the other process may finish after the event monitor fires.
@@ -183,11 +184,11 @@ import TranslationCore
                     guard input.hasFocus(focus) else { if pendingID == id { hud.hide() }; return }
                     input.expectFocus(focus)
                     defer { input.clear() }
-                    let target = try input.capture(mode: .triggeredLine(trigger))
+                    let target = try input.capture(mode: mode)
                     hud.showProgress("Checking input…", near: input.bounds(for: focus, range: target.triggerRange))
                     try Task.checkCancellation()
                     pendingTrigger = nil
-                    translate(focus: focus, trigger: trigger)
+                    translate(focus: focus, mode: mode)
                     return
                 } catch InputError.noTrigger {
                     continue
@@ -204,7 +205,9 @@ import TranslationCore
                 }
             }
             if pendingID == id {
-                let message = "Couldn’t confirm the line-end trigger and cursor position."
+                let message = mode.isWholeInput
+                    ? "Couldn’t confirm the whole-input trigger and cursor position."
+                    : "Couldn’t confirm the line-end trigger and cursor position."
                 model.setStatus(message)
                 hud.showFailure(message)
             }
@@ -212,13 +215,13 @@ import TranslationCore
         }
     }
 
-    private func translate(focus: AccessibilityInput.FocusToken, trigger: TranslationTrigger) {
+    private func translate(focus: AccessibilityInput.FocusToken, mode: CaptureMode) {
         guard task == nil else { return }
         task = Task { @MainActor in
             defer { task = nil }
             do {
                 input.expectFocus(focus)
-                try await workflow.perform(mode: .triggeredLine(trigger)) {
+                try await workflow.perform(mode: mode) {
                     self.model.setStatus("Translating…")
                     self.hud.showProgress("Translating…")
                 }

@@ -25,15 +25,15 @@ import TranslationCore
     }
 
     /// Called only after TextTarget has validated the range and rejected the trigger.
-    static func captureRejected(text: String, selection: NSRange, trigger: TranslationTrigger) {
-        let metadata = triggerMetadata(text: text, selection: selection, trigger: trigger)
+    static func captureRejected(text: String, selection: NSRange, trigger: TranslationTrigger, wholeInput: Bool = false) {
+        let metadata = triggerMetadata(text: text, selection: selection, trigger: trigger, wholeInput: wholeInput)
         guard metadata != lastRejectedCapture else { return }
         lastRejectedCapture = metadata
         event("capture.trigger_mismatch", metadata)
     }
 
     /// The caller must first validate the range with TextTarget.
-    private static func triggerMetadata(text: String, selection: NSRange, trigger: TranslationTrigger) -> String {
+    private static func triggerMetadata(text: String, selection: NSRange, trigger: TranslationTrigger, wholeInput: Bool) -> String {
         let string = text as NSString
         var start = 0, end = 0, contentsEnd = 0
         string.getLineStart(&start, end: &end, contentsEnd: &contentsEnd,
@@ -42,6 +42,6 @@ import TranslationCore
         let caretEnd = NSMaxRange(selection)
         let prefix = caretEnd <= contentsEnd
             ? string.substring(with: NSRange(location: start, length: caretEnd - start)) : ""
-        return "full_length=\(string.length) selection=\(selection.location),\(selection.length) line=\(start),\(contentsEnd - start) selection_at_line_end=\(caretEnd == contentsEnd) marker_at_line_end=\(trigger.source(in: line) != nil) marker_at_caret=\(trigger.source(in: prefix) != nil) marker_before_whitespace=\(trigger.source(in: line.trimmingCharacters(in: .whitespaces)) != nil)"
+        return "scope=\(wholeInput ? "field" : "line") full_length=\(string.length) selection=\(selection.location),\(selection.length) line=\(start),\(contentsEnd - start) selection_at_line_end=\(caretEnd == contentsEnd) selection_at_field_end=\(caretEnd == string.length) marker_at_field_end=\(trigger.source(in: text) != nil) marker_at_line_end=\(trigger.source(in: line) != nil) marker_at_caret=\(trigger.source(in: prefix) != nil) marker_before_whitespace=\(trigger.source(in: line.trimmingCharacters(in: .whitespaces)) != nil)"
     }
 }
