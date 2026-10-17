@@ -502,7 +502,7 @@ PRではブランチ名とVERSIONの一致を確認し、マージしたコミ�
 
 ### インストール
 
-READMEは、GitHubのreleases/latest/downloadからcurlで最新のZIPを取得し、利用者のApplicationsディレクトリへ展開する手順を案内する。
+READMEは、GitHubのreleases/latest/downloadからcurlで最新のZIPを取得し、`/Applications`へ展開する手順を案内する。
 この最新リリースの参照方法は[GitHubの説明](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases)に基づく。
 取得・展開・起動許可・起動の4コマンドを&&でつなぎ、途中で失敗した場合は次へ進まない。
 チェックサムはReleaseの配布物に残し、インストール手順の実行では取得しない。

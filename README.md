@@ -12,12 +12,12 @@ Quit any running copy of Quick Input Translator and run these commands to instal
 
 ```sh
 curl -fL https://github.com/azu/quick-input-translator/releases/latest/download/quick-input-translator-macos-arm64.zip -o "$TMPDIR/quick-input-translator.zip" &&
-ditto -x -k "$TMPDIR/quick-input-translator.zip" "$HOME/Applications" &&
-xattr -dr com.apple.quarantine "$HOME/Applications/Quick Input Translator.app" &&
-open "$HOME/Applications/Quick Input Translator.app"
+ditto -x -k "$TMPDIR/quick-input-translator.zip" /Applications &&
+xattr -dr com.apple.quarantine "/Applications/Quick Input Translator.app" &&
+open "/Applications/Quick Input Translator.app"
 ```
 
-The app is installed in `~/Applications`. For an update, quit the app and repeat the same commands; they automatically use the newest release. Because release builds use ad-hoc signing, you may need to remove and re-add the app in **System Settings → Privacy & Security → Accessibility** after updating. Language and trigger settings keep the same bundle identifier.
+The app is installed in `/Applications`. For an update, quit the app and repeat the same commands; they automatically use the newest release. Because release builds use ad-hoc signing, you may need to remove and re-add the app in **System Settings → Privacy & Security → Accessibility** after updating. Language and trigger settings keep the same bundle identifier.
 
 ## Build from source
 
