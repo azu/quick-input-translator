@@ -35,6 +35,33 @@ public struct TextCoordinates: Equatable, Sendable {
             || selected == (indexedText as NSString).substring(with: nativeRange)
     }
 
+    /// A rich editor can serialize one paragraph separator as two LF characters
+    /// in pasted plain text. Only verified display-only separators may differ;
+    /// indexed line breaks and every other character must still match exactly.
+    public func matchesPastedText(_ expected: String) -> Bool {
+        let display = Array(displayedText.utf16), expected = Array(expected.utf16)
+        var position = 0, other = 0
+        while position < display.count {
+            if display[position] == 10 {
+                let start = position
+                var generated = 0
+                while position < display.count, display[position] == 10 {
+                    if offsets[position] == offsets[position + 1] { generated += 1 }
+                    position += 1
+                }
+                let expectedStart = other
+                while other < expected.count, expected[other] == 10 { other += 1 }
+                let count = other - expectedStart, displayedCount = position - start
+                guard count >= displayedCount, count <= displayedCount + generated else { return false }
+            } else {
+                guard other < expected.count, display[position] == expected[other] else { return false }
+                position += 1
+                other += 1
+            }
+        }
+        return other == expected.count
+    }
+
     public func indexedRange(for range: NSRange) throws -> NSRange {
         guard range.location >= 0, range.length >= 0, range.location < offsets.count,
               range.length < offsets.count - range.location else { throw InputError.invalidRange }

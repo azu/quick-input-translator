@@ -8,6 +8,7 @@ import TranslationCore
         original: String, expected: String,
         attempts: Int = 100, interval: Duration = .milliseconds(20),
         read: () throws -> String, hasFocus: () -> Bool,
+        matchesExpected: ((String) throws -> Bool)? = nil,
         onObservation: (Observation) -> Void = { _ in }
     ) async throws {
         var previous: Observation?
@@ -19,6 +20,12 @@ import TranslationCore
             guard hasFocus() else { observe(.focusLost); throw InputError.unconfirmed }
             if let current = try? read() {
                 if current == expected { observe(.expected); return }
+                if current != original, (try? matchesExpected?(current)) == true {
+                    guard !Task.isCancelled else { observe(.cancelled); throw InputError.unconfirmed }
+                    guard hasFocus() else { observe(.focusLost); throw InputError.unconfirmed }
+                    observe(.expected)
+                    return
+                }
                 guard current == original else { observe(.different); throw InputError.unconfirmed }
                 observe(.original)
             } else { observe(.unreadable) }

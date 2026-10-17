@@ -54,3 +54,32 @@ import TranslationCore
         #expect(error as? InputError == .unconfirmed)
     }
 }
+
+@Test @MainActor func pastedParagraphRepresentationCanConfirmWithoutAnotherPaste() async throws {
+    var reads = 0, comparisons = 0
+    try await ReplacementConfirmation.wait(original: "前\n後:::", expected: "First\n\nLast",
+                                             attempts: 3, interval: .zero) {
+        reads += 1
+        return reads == 1 ? "前\n後:::" : "First\nLast"
+    } hasFocus: { true } matchesExpected: { current in
+        comparisons += 1
+        return try TextCoordinates(displayed: current, indexed: "FirstLast").matchesPastedText("First\n\nLast")
+    }
+    #expect(reads == 2)
+    #expect(comparisons == 1)
+}
+
+@Test @MainActor func focusLostDuringParagraphComparisonCannotConfirm() async {
+    var focused = true
+    do {
+        try await ReplacementConfirmation.wait(original: "原文:::", expected: "First\n\nLast") {
+            "First\nLast"
+        } hasFocus: { focused } matchesExpected: { _ in
+            focused = false
+            return true
+        }
+        Issue.record("Focus must still match after the additional AX read")
+    } catch {
+        #expect(error as? InputError == .unconfirmed)
+    }
+}

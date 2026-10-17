@@ -172,10 +172,18 @@ enum ExternalInputError: LocalizedError {
             clipboard.restoreIfUnchanged()
             throw error
         }
-        try await ReplacementConfirmation.wait(original: target.fullText, expected: target.replacing(with: translation)) {
+        let expected = target.replacing(with: translation)
+        try await ReplacementConfirmation.wait(original: target.fullText, expected: expected) {
             try self.textValue(saved.focus)
         } hasFocus: {
             self.hasFocus(saved.focus)
+        } matchesExpected: { current in
+            // Read a fresh mapping: the paragraph structure can change on paste.
+            let coordinates = try AXTextCoordinates.read(element, displayed: current)
+            let matches = coordinates.matchesPastedText(expected)
+            Diagnostics.event("replacement.compared", "expected_length=\(expected.utf16.count) current_length=\(current.utf16.count) indexed_length=\(coordinates.indexedLength) expected_linefeeds=\(expected.utf16.filter { $0 == 10 }.count) current_linefeeds=\(current.utf16.filter { $0 == 10 }.count) paragraph_text_matches=\(matches)")
+            guard matches, self.hasFocus(saved.focus) else { return false }
+            return try self.textValue(saved.focus) == current
         } onObservation: { state in
             Diagnostics.event("replacement.observed", "state=\(state.rawValue)")
         }

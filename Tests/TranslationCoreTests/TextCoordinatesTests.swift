@@ -71,3 +71,21 @@ import Testing
     let whole = NSRange(location: 0, length: text.utf16.count)
     #expect(try !mapping.matchesSelectedText("前後:::", range: whole))
 }
+
+@Test func pastedParagraphsAllowDoubleLFOnlyAtVerifiedGeneratedSeparators() throws {
+    let displayed = "🙂First\nSecond\nThird"
+    let mapping = try TextCoordinates(displayed: displayed, indexed: "🙂FirstSecondThird")
+    #expect(mapping.matchesPastedText(displayed))
+    #expect(mapping.matchesPastedText("🙂First\n\nSecond\n\nThird"))
+    #expect(!mapping.matchesPastedText("🙂FirstSecond\nThird"))
+    #expect(!mapping.matchesPastedText("🙂First\n\n\nSecond\nThird"))
+    #expect(!mapping.matchesPastedText("🙂First\nSecond!\nThird"))
+    #expect(!mapping.matchesPastedText("🙂First\n Second\nThird"))
+    #expect(!mapping.matchesPastedText("🙂First\nSecond\nThird\n"))
+
+    let mixed = try TextCoordinates(displayed: displayed, indexed: "🙂FirstSecond\nThird")
+    #expect(mixed.matchesPastedText("🙂First\n\nSecond\nThird"))
+    #expect(!mixed.matchesPastedText("🙂First\nSecond\n\nThird"))
+    let plain = try TextCoordinates(displayed: displayed, indexed: displayed)
+    #expect(!plain.matchesPastedText("🙂First\n\nSecond\nThird"))
+}
