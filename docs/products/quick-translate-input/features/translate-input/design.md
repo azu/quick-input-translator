@@ -224,8 +224,12 @@ shouldChangeText・textStorageの変更・didChangeTextを通し、SwiftUIへの
 
 全文が一致しない場合は、貼り付け後のAXValueとAXStringForRangeを読み直して段落の表現差を確認する。
 表示上にだけあると確認できた段落区切りに限り、LF一つと二つの差を認める。
-これは、[ProseMirrorの貼り付け処理](https://github.com/ProseMirror/prosemirror-view/blob/master/src/clipboard.ts)のように、連続した改行を段落に変換する入力欄を扱うため。
-段落の位置と通常の改行、本文・空白・記号は一致することを要求し、改行を一律に除去して比較しない。
+翻訳前に表示用の段落区切りがあると確認できた同じ入力欄では、その情報も引き継ぐ。
+貼り付け後にAXStringForRangeの改行表現が変わっても、同じ欄を通常のテキスト欄と誤認しないため。
+[Blueskyの入力欄](https://github.com/bluesky-social/social-app/blob/main/src/view/com/composer/text-input/TextInput.web.tsx)は、貼り付けた各行を空行も含めて段落に変換する。
+このとき、空の段落を含む訳文とAXValueが返す文字列とで改行数が変わる場合に対応する。
+段落区切りの位置と本文・空白・記号は一致することを要求し、改行を一律に除去して比較しない。
+段落の表現差を確認できていない通常の入力欄では、改行数も一致させる。
 追加の読み取り後もフォーカスと本文、キャンセル状態を確認してから成功にする。
 
 クリップボードと選択位置の復元は、処理がどこまで進んだかで分ける。

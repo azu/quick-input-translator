@@ -89,3 +89,20 @@ import Testing
     let plain = try TextCoordinates(displayed: displayed, indexed: displayed)
     #expect(!plain.matchesPastedText("🙂First\n\nSecond\nThird"))
 }
+
+@Test func paragraphEvidenceSurvivesChangedRangeRepresentationAfterPaste() throws {
+    let original = try TextCoordinates(displayed: "前\n中\n後:::", indexed: "前中後:::")
+    let current = "First\nMiddle\nLast"
+    // Observed in Arc/Bluesky: range reads include LF after paste, even though
+    // the same field's range reads omitted them before paste.
+    let after = try TextCoordinates(displayed: current, indexed: current)
+    let expected = "First\n\nMiddle\n\nLast"
+    #expect(!after.matchesPastedText(expected))
+    #expect(after.matchesPastedText(expected, original: original))
+    #expect(!after.matchesPastedText("First\n\nChanged\n\nLast", original: original))
+    #expect(!after.matchesPastedText("First\n\nMiddle \n\nLast", original: original))
+    #expect(!after.matchesPastedText("FirstMiddle\n\nLast", original: original))
+    #expect(!after.matchesPastedText(expected + "\n", original: original))
+    let plainOriginal = try TextCoordinates(displayed: "前\n中\n後:::", indexed: "前\n中\n後:::")
+    #expect(!after.matchesPastedText(expected, original: plainOriginal))
+}

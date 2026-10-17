@@ -57,13 +57,15 @@ import TranslationCore
 
 @Test @MainActor func pastedParagraphRepresentationCanConfirmWithoutAnotherPaste() async throws {
     var reads = 0, comparisons = 0
+    let before = try TextCoordinates(displayed: "前\n後:::", indexed: "前後:::")
     try await ReplacementConfirmation.wait(original: "前\n後:::", expected: "First\n\nLast",
                                              attempts: 3, interval: .zero) {
         reads += 1
         return reads == 1 ? "前\n後:::" : "First\nLast"
     } hasFocus: { true } matchesExpected: { current in
         comparisons += 1
-        return try TextCoordinates(displayed: current, indexed: "FirstLast").matchesPastedText("First\n\nLast")
+        return try TextCoordinates(displayed: current, indexed: current)
+            .matchesPastedText("First\n\nLast", original: before)
     }
     #expect(reads == 2)
     #expect(comparisons == 1)

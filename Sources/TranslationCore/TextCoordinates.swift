@@ -37,8 +37,10 @@ public struct TextCoordinates: Equatable, Sendable {
 
     /// A rich editor can serialize one paragraph separator as two LF characters
     /// in pasted plain text. Only verified display-only separators may differ;
-    /// indexed line breaks and every other character must still match exactly.
-    public func matchesPastedText(_ expected: String) -> Bool {
+    /// A previously verified paragraph field can expose empty paragraphs
+    /// differently after paste. Retain that evidence from the same input field.
+    public func matchesPastedText(_ expected: String, original: TextCoordinates? = nil) -> Bool {
+        let paragraphField = original?.isIdentity == false
         let display = Array(displayedText.utf16), expected = Array(expected.utf16)
         var position = 0, other = 0
         while position < display.count {
@@ -52,7 +54,8 @@ public struct TextCoordinates: Equatable, Sendable {
                 let expectedStart = other
                 while other < expected.count, expected[other] == 10 { other += 1 }
                 let count = other - expectedStart, displayedCount = position - start
-                guard count >= displayedCount, count <= displayedCount + generated else { return false }
+                let allowance = paragraphField ? displayedCount : generated
+                guard count >= displayedCount, count <= displayedCount + allowance else { return false }
             } else {
                 guard other < expected.count, display[position] == expected[other] else { return false }
                 position += 1
