@@ -6,30 +6,18 @@ Translate the line or entire input field you’re writing without leaving your a
 
 ## Install
 
-Requires an Apple Silicon Mac running macOS 26 or later. Release downloads are ad-hoc signed and aren’t notarized. The commands below verify the download checksum and remove the quarantine attribute from this app so it can be opened. Xcode and an Apple Development certificate aren’t needed for a release download.
+Requires an Apple Silicon Mac running macOS 26 or later. Release downloads are ad-hoc signed and aren’t notarized. The commands below download the app and remove its quarantine attribute so it can be opened. Xcode and an Apple Development certificate aren’t needed for a release download.
 
-After the first release is published, quit any running copy of Quick Input Translator and run these commands. Change `version` to the release you want:
+Quit any running copy of Quick Input Translator and run these commands to install the latest release:
 
 ```sh
-(
-  set -eu
-  version=v0.1.0
-  archive=quick-input-translator-macos-arm64.zip
-  release_url="https://github.com/azu/quick-input-translator/releases/download/$version"
-  download_dir="$(mktemp -d)"
-  trap 'rm -rf "$download_dir"' EXIT
-  cd "$download_dir"
-  curl -fL "$release_url/$archive" -o "$archive"
-  curl -fL "$release_url/$archive.sha256" -o "$archive.sha256"
-  shasum -a 256 -c "$archive.sha256"
-  mkdir -p "$HOME/Applications"
-  ditto -x -k "$archive" "$HOME/Applications"
-  xattr -dr com.apple.quarantine "$HOME/Applications/Quick Input Translator.app"
-  open "$HOME/Applications/Quick Input Translator.app"
-)
+curl -fL https://github.com/azu/quick-input-translator/releases/latest/download/quick-input-translator-macos-arm64.zip -o "$TMPDIR/quick-input-translator.zip" &&
+ditto -x -k "$TMPDIR/quick-input-translator.zip" "$HOME/Applications" &&
+xattr -dr com.apple.quarantine "$HOME/Applications/Quick Input Translator.app" &&
+open "$HOME/Applications/Quick Input Translator.app"
 ```
 
-The app is installed in `~/Applications`. For an update, quit the app and repeat the commands with the new version. Because release builds use ad-hoc signing, you may need to remove and re-add the app in **System Settings → Privacy & Security → Accessibility** after updating. Language and trigger settings keep the same bundle identifier.
+The app is installed in `~/Applications`. For an update, quit the app and repeat the same commands; they automatically use the newest release. Because release builds use ad-hoc signing, you may need to remove and re-add the app in **System Settings → Privacy & Security → Accessibility** after updating. Language and trigger settings keep the same bundle identifier.
 
 ## Build from source
 
@@ -138,8 +126,8 @@ The release PR body starts with GitHub’s automatically generated release notes
 You can also release the current version by pushing its matching tag, including the first release:
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag "v$(cat VERSION)"
+git push origin "v$(cat VERSION)"
 ```
 
 The **Release** workflow also accepts an existing tag through manual dispatch for retries. It refuses a tag that differs from `VERSION`. Assets are attached to a draft before publication; a retry can replace assets in a draft, but doesn’t overwrite an already published release. Both workflows use `GITHUB_TOKEN`; no signing secrets or personal access token are required. If a bot merges the release PR using `GITHUB_TOKEN`, create and push the matching tag yourself, because that merge event won’t start another workflow.
