@@ -3,10 +3,15 @@ name: Create Release PR
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: New version (e.g. 0.1.1, without v)
+      bump:
+        description: SemVer increment
         required: true
-        type: string
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions: {}
 
@@ -30,13 +35,13 @@ jobs:
       - run: bash scripts/test-version.sh
       - name: Bump version and open PR
         env:
-          NEW_VERSION: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/version.sh --set "$NEW_VERSION"
+          NEW_VERSION="$(bash scripts/version.sh --bump "$BUMP")"
           branch="release/v$NEW_VERSION"
           git switch -c "$branch"
           git config user.name 'github-actions[bot]'

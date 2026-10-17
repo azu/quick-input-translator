@@ -21,6 +21,31 @@ expect_rejected_bump() {
     [[ "$(cat "$fixture/VERSION")" == "$1" ]]
 }
 
+expect_semver_bump() {
+    printf '%s\n' "$1" > "$fixture/VERSION"
+    actual="$(bash "$fixture/scripts/version.sh" --bump "$2")"
+    [[ "$actual" == "$3" && "$(cat "$fixture/VERSION")" == "$3" ]]
+}
+
+expect_semver_bump 1.2.3 patch 1.2.4
+expect_semver_bump 1.2.3 minor 1.3.0
+expect_semver_bump 1.2.3 major 2.0.0
+expect_semver_bump 0.0.0 patch 0.0.1
+expect_semver_bump 0.1.0 minor 0.2.0
+expect_semver_bump 0.1.0 major 1.0.0
+expect_semver_bump 1.2.99 patch 1.2.100
+expect_semver_bump 1.99.5 minor 1.100.0
+expect_semver_bump 99.5.7 major 100.0.0
+expect_semver_bump 1.2.99999999999999999999 patch 1.2.100000000000000000000
+for invalid in '' prerelease PATCH 'minor;touch nope'; do
+    printf '0.1.0\n' > "$fixture/VERSION"
+    if bash "$fixture/scripts/version.sh" --bump "$invalid" >/dev/null 2>&1; then
+        printf 'Unexpectedly accepted bump: %s\n' "$invalid" >&2
+        exit 1
+    fi
+    [[ "$(cat "$fixture/VERSION")" == 0.1.0 ]]
+done
+
 expect_bump 0.1.0 0.1.1
 expect_bump 0.1.9 0.1.10
 expect_bump 0.9.99 0.10.0

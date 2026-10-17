@@ -466,8 +466,13 @@ Developer ID署名と公証は行わない。仮署名での更新では、権�
 
 ### リリースPRとタグ
 
-Create Release PRをmainで手動実行すると、指定された新しいバージョンを検証し、VERSIONだけを更新するPRを作成する。
-バージョンは数字3組とし、現在以下の値や不正な文字列は変更前に拒否する。
+Create Release PRをmainで手動実行すると、patch・minor・majorの選択から次のバージョンを計算し、VERSIONだけを更新するPRを作成する。
+選択欄はGitHub Actionsのchoice入力を使い、初期値はpatchとする。
+計算はシェルで行い、minorではpatchを0に、majorではminorとpatchを0に戻す。
+この更新規則は[Semantic Versioningの仕様](https://semver.org/)に従う。
+
+バージョンは数字3組とし、プレリリースの接尾辞とビルド情報は扱わない。
+直接バージョンを設定するローカル操作でも、現在以下の値や不正な文字列は変更前に拒否する。
 
 Releaseは、同じリポジトリのrelease/vで始まるブランチからmainへのPRがマージされた場合と、vで始まるタグがpushされた場合に実行する。
 PRではブランチ名とVERSIONの一致を確認し、マージしたコミットにタグを付ける。

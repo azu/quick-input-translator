@@ -13,6 +13,20 @@ validate_version() {
     fi
 }
 
+increment_decimal() {
+    local value="$1" suffix='' index digit
+    for ((index=${#value}-1; index>=0; index--)); do
+        digit="${value:index:1}"
+        if [[ "$digit" == 9 ]]; then
+            suffix="0$suffix"
+        else
+            printf '%s%s%s' "${value:0:index}" "$((digit + 1))" "$suffix"
+            return
+        fi
+    done
+    printf '1%s' "$suffix"
+}
+
 validate_version "$current"
 case "${1:-}" in
     '') [[ "$#" == 0 ]] ;;
@@ -23,11 +37,21 @@ case "${1:-}" in
             exit 1
         fi
         ;;
-    --set)
+    --set|--bump)
         [[ "$#" == 2 ]]
-        validate_version "$2"
         IFS=. read -r -a current_parts <<< "$current"
-        IFS=. read -r -a new_parts <<< "$2"
+        if [[ "$1" == --bump ]]; then
+            case "$2" in
+                patch) next="${current_parts[0]}.${current_parts[1]}.$(increment_decimal "${current_parts[2]}")" ;;
+                minor) next="${current_parts[0]}.$(increment_decimal "${current_parts[1]}").0" ;;
+                major) next="$(increment_decimal "${current_parts[0]}").0.0" ;;
+                *) printf '%s\n' 'Bump must be patch, minor, or major.' >&2; exit 1 ;;
+            esac
+        else
+            next="$2"
+        fi
+        validate_version "$next"
+        IFS=. read -r -a new_parts <<< "$next"
         newer=false
         for index in 0 1 2; do
             old="${current_parts[$index]}"
@@ -44,11 +68,11 @@ case "${1:-}" in
             printf '%s\n' 'New version must be greater than the current version.' >&2
             exit 1
         fi
-        current="$2"
+        current="$next"
         printf '%s\n' "$current" > "$version_file"
         ;;
     *)
-        printf '%s\n' 'Usage: bash scripts/version.sh [--set VERSION | --check-tag TAG]' >&2
+        printf '%s\n' 'Usage: bash scripts/version.sh [--bump patch|minor|major | --set VERSION | --check-tag TAG]' >&2
         exit 1
         ;;
 esac
