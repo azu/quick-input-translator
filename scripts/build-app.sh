@@ -7,7 +7,7 @@ cd "$project_dir"
 # requests disagreeing. Require the app to exit before updating its bundle.
 ensure_app_stopped() {
     if pgrep -x QuickTranslateInput >/dev/null; then
-        printf '%s\n' 'Quick Translate Inputを終了してからビルドしてください。起動中のアプリは更新しません。' >&2
+        printf '%s\n' 'Quick Input Translatorを終了してからビルドしてください。起動中のアプリは更新しません。' >&2
         exit 1
     else
         local process_check_status=$?
@@ -41,35 +41,27 @@ fi
 
 swift build -c release
 binary_dir="$(swift build -c release --show-bin-path)"
-bundle_dir="$project_dir/dist/Quick Translate Input.app"
+bundle_dir="$project_dir/dist/Quick Input Translator.app"
+legacy_bundle="$project_dir/dist/Quick Translate Input.app"
+previous_bundle="$bundle_dir"
+if [[ -d "$legacy_bundle" ]]; then
+    if [[ -e "$bundle_dir" ]]; then
+        printf '%s\n' '新旧両方のアプリがあります。利用する版を確認してからビルドしてください。' >&2
+        exit 1
+    fi
+    previous_bundle="$legacy_bundle"
+fi
 mkdir -p "$project_dir/dist"
 staging_dir="$(mktemp -d "$project_dir/dist/.QuickTranslateInput.XXXXXX")"
 trap 'rm -rf "$staging_dir"' EXIT
-staged_bundle="$staging_dir/Quick Translate Input.app"
-mkdir -p "$staged_bundle/Contents/MacOS"
-cp "$binary_dir/QuickTranslateInput" "$staged_bundle/Contents/MacOS/QuickTranslateInput"
-cat > "$staged_bundle/Contents/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>QuickTranslateInput</string>
-<key>CFBundleIdentifier</key><string>info.efcl.quick-translate-input</string>
-<key>CFBundleName</key><string>Quick Translate Input</string>
-<key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.0</string>
-<key>CFBundleVersion</key><string>1</string>
-<key>LSMinimumSystemVersion</key><string>26.0</string>
-<key>LSUIElement</key><true/>
-<key>NSHighResolutionCapable</key><true/>
-</dict></plist>
-PLIST
-plutil -insert QTIBuildID -string "$(date -u '+%Y%m%dT%H%M%SZ')" "$staged_bundle/Contents/Info.plist"
+staged_bundle="$staging_dir/Quick Input Translator.app"
+bash "$project_dir/scripts/assemble-app.sh" "$staged_bundle" "$binary_dir/QuickTranslateInput"
 codesign --force --sign "$signing_identity" --timestamp=none "$staged_bundle"
 codesign --verify --strict "$staged_bundle"
 
 ensure_app_stopped
-if [[ -d "$bundle_dir" ]]; then
-    previous_requirement="$(codesign -d -r- "$bundle_dir" 2>&1 | sed -n 's/^#\{0,1\} *designated => //p')"
+if [[ -d "$previous_bundle" ]]; then
+    previous_requirement="$(codesign -d -r- "$previous_bundle" 2>&1 | sed -n 's/^#\{0,1\} *designated => //p')"
     if [[ -z "$previous_requirement" ]]; then
         printf '%s\n' '既存アプリの署名を確認できないため、更新を中止しました。' >&2
         exit 1
@@ -79,10 +71,10 @@ if [[ -d "$bundle_dir" ]]; then
     else
         codesign --verify --strict -R="$previous_requirement" "$staged_bundle"
     fi
-    mv "$bundle_dir" "$staging_dir/previous.app"
+    mv "$previous_bundle" "$staging_dir/previous.app"
 fi
 if ! mv "$staged_bundle" "$bundle_dir"; then
-    if [[ -d "$staging_dir/previous.app" ]]; then mv "$staging_dir/previous.app" "$bundle_dir"; fi
+    if [[ -d "$staging_dir/previous.app" ]]; then mv "$staging_dir/previous.app" "$previous_bundle"; fi
     exit 1
 fi
 printf '%s\n' "$bundle_dir"

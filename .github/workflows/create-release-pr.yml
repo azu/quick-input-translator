@@ -1,0 +1,49 @@
+name: Create Release PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: New version (e.g. 0.1.1, without v)
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: create-release-pr
+  cancel-in-progress: false
+
+jobs:
+  create:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          persist-credentials: false
+      - run: bash scripts/test-version.sh
+      - name: Bump version and open PR
+        env:
+          NEW_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/version.sh --set "$NEW_VERSION"
+          branch="release/v$NEW_VERSION"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add VERSION
+          git commit -m "chore: release v$NEW_VERSION"
+          gh auth setup-git
+          git push origin "$branch"
+          printf 'Release version %s. Merging this PR builds and publishes the release.\n' "$NEW_VERSION" > "$RUNNER_TEMP/release-body.md"
+          gh pr create --base main --head "$branch" --title "Release v$NEW_VERSION" --body-file "$RUNNER_TEMP/release-body.md"

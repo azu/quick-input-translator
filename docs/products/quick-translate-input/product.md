@@ -1,4 +1,4 @@
-# Quick Translate Input
+# Quick Input Translator
 
 ## 概要
 

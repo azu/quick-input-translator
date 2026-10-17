@@ -32,7 +32,7 @@ import TranslationCore
         Diagnostics.event("app.started", "build=\(Bundle.main.object(forInfoDictionaryKey: "QTIBuildID") as? String ?? "unknown") pid=\(getpid())")
         installMainMenu()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "Quick Translate Input")
+        item.button?.image = NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "Quick Input Translator")
         let menu = NSMenu()
         menu.delegate = self
         menu.addItem(pairMenuItem)
@@ -100,7 +100,7 @@ import TranslationCore
         let main = NSMenu()
         let applicationItem = NSMenuItem()
         let application = NSMenu()
-        let quit = NSMenuItem(title: "Quit Quick Translate Input", action: #selector(quit), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit Quick Input Translator", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         let settings = NSMenuItem(title: "Settings…", action: #selector(showSetup), keyEquivalent: ",")
         settings.target = self
@@ -125,7 +125,7 @@ import TranslationCore
         if window == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 690),
                                   styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            window.title = "Quick Translate Input Settings"
+            window.title = "Quick Input Translator Settings"
             window.contentView = NSHostingView(rootView: SetupView(model: model))
             window.isReleasedWhenClosed = false
             window.center()

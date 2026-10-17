@@ -151,7 +151,7 @@ struct SetupView: View {
                         .frame(width: 46, height: 46)
                         .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Quick Translate Input").font(.title2.weight(.semibold))
+                        Text("Quick Input Translator").font(.title2.weight(.semibold))
                         Text("Translate right where you’re writing.")
                             .foregroundStyle(.secondary)
                     }

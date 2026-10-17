@@ -1,19 +1,50 @@
-# Quick Translate Input
+# Quick Input Translator
 
-Translate the line or entire input field you’re writing without leaving your app. Type a trigger at the end of the line or field, and Quick Translate Input replaces it with a translation using Apple’s Translation framework.
+Translate the line or entire input field you’re writing without leaving your app. Type a trigger at the end of the line or field, and Quick Input Translator replaces it with a translation using Apple’s Translation framework.
 
-## Get started
+## Install
 
-Requires macOS 26 or later, a compatible Xcode installation, and an Apple Development signing certificate in your keychain. No third-party dependencies or translation API keys are needed.
+Requires an Apple Silicon Mac running macOS 26 or later. Release downloads are ad-hoc signed and aren’t notarized. The commands below verify the download checksum and remove the quarantine attribute from this app so it can be opened. Xcode and an Apple Development certificate aren’t needed for a release download.
+
+After the first release is published, quit any running copy of Quick Input Translator and run these commands. Change `version` to the release you want:
+
+```sh
+(
+  set -eu
+  version=v0.1.0
+  archive=quick-input-translator-macos-arm64.zip
+  release_url="https://github.com/azu/quick-input-translator/releases/download/$version"
+  download_dir="$(mktemp -d)"
+  trap 'rm -rf "$download_dir"' EXIT
+  cd "$download_dir"
+  curl -fL "$release_url/$archive" -o "$archive"
+  curl -fL "$release_url/$archive.sha256" -o "$archive.sha256"
+  shasum -a 256 -c "$archive.sha256"
+  mkdir -p "$HOME/Applications"
+  ditto -x -k "$archive" "$HOME/Applications"
+  xattr -dr com.apple.quarantine "$HOME/Applications/Quick Input Translator.app"
+  open "$HOME/Applications/Quick Input Translator.app"
+)
+```
+
+The app is installed in `~/Applications`. For an update, quit the app and repeat the commands with the new version. Because release builds use ad-hoc signing, you may need to remove and re-add the app in **System Settings → Privacy & Security → Accessibility** after updating. Language and trigger settings keep the same bundle identifier.
+
+## Build from source
+
+Local builds require macOS 26 or later, a compatible Xcode installation, and an Apple Development signing certificate in your keychain. No third-party dependencies or translation API keys are needed.
 
 ```sh
 bash scripts/build-app.sh
-open "dist/Quick Translate Input.app"
+open "dist/Quick Input Translator.app"
 ```
 
 The build automatically uses your Apple Development certificate when exactly one is available. Otherwise, set `CODE_SIGN_IDENTITY` to the certificate’s ID. Builds keep the same signing identity, bundle identifier, and app location so Accessibility permission can survive updates. Switching from an older ad-hoc build requires granting permission once again.
 
-Quit Quick Translate Input before rebuilding. The build stops if the app is still running, so it doesn’t replace the bundle underneath a process using Accessibility access. Open the new build after the update completes.
+The first build after the rename migrates `dist/Quick Translate Input.app` to `dist/Quick Input Translator.app` after checking the signing requirement. Your saved settings use the same bundle identifier; check Accessibility access after this one-time location change.
+
+Quit Quick Input Translator before rebuilding. The build stops if the app is still running, so it doesn’t replace the bundle underneath a process using Accessibility access. Open the new build after the update completes.
+
+## Set up
 
 Open **Settings…** from the menu bar icon, or press **Command+,** while the app is active.
 
@@ -68,13 +99,14 @@ bash scripts/logs.sh --stream
 
 Logs record operation IDs, processing stages, app identifiers, numeric ranges, OS return codes, and whether replacement matched the expected result. Source text, translations, clipboard contents, and keystroke history aren’t logged or saved.
 
-The app is signed for local development. Developer ID distribution and notarization aren’t set up. The build refuses to silently switch to ad-hoc signing, and preserves the existing app if signing fails.
+Local builds use your Apple Development certificate and refuse to silently switch to ad-hoc signing. Release ZIPs explicitly use ad-hoc signing. Developer ID signing and notarization aren’t set up.
 
 ## Development
 
 ```sh
 swift test
 swift build
+bash scripts/test-version.sh
 ./bin/sdev lint
 ```
 
@@ -89,3 +121,24 @@ RUN_TRANSLATION_INTEGRATION=1 swift test --filter installedJapaneseEnglishModelT
 These opt-in tests check single-string translation and whole-field translation followed by native-editor replacement. They don’t download models and are skipped in normal test runs.
 
 Start with the [project documentation](docs/README.md) for the product, requirements, and design. The design notes are currently in Japanese.
+
+## Releases
+
+`VERSION` is the source for the app version and release tag. Versions use `MAJOR.MINOR.PATCH`; tags use `vMAJOR.MINOR.PATCH`.
+
+Run **Create Release PR** in GitHub Actions on `main` and enter a version greater than `VERSION`. The workflow changes only `VERSION` and opens a `release/v…` PR. Review and merge that PR to create the tag, run tests on macOS 26, and publish the Apple Silicon ZIP and SHA-256 checksum. Enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** if PR creation is disabled.
+
+You can also release the current version by pushing its matching tag, including the first release:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The **Release** workflow also accepts an existing tag through manual dispatch for retries. It refuses a tag that differs from `VERSION`. Assets are attached to a draft before publication; a retry can replace assets in a draft, but doesn’t overwrite an already published release. Both workflows use `GITHUB_TOKEN`; no signing secrets or personal access token are required. If a bot merges the release PR using `GITHUB_TOKEN`, create and push the matching tag yourself, because that merge event won’t start another workflow.
+
+To package a release locally without modifying the certificate-signed app in `dist`:
+
+```sh
+bash scripts/package-release.sh
+```

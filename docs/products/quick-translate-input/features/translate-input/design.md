@@ -419,15 +419,26 @@ AXSecureTextFieldの判定を先に行うことで、取得後に本文の種類
 ### 生成物と署名元
 
 ローカルビルドでapp bundleを生成し、固定のコード署名証明書で署名する。
-更新後も同じアプリとして識別されるよう、アプリ識別子と起動場所も保つ。
+通常の更新では、アプリ識別子と起動場所も保つ。
 
 署名には、キーチェーン内のApple Development証明書を使う。
 候補が一つなら自動で選び、それ以外はCODE_SIGN_IDENTITYで指定する。
 署名に使う秘密鍵とキーチェーンの信頼設定は、既存のものを利用する。
 
+### アプリ名の変更
+
+表示名と生成先をQuick Input Translatorにそろえる。
+CFBundleDisplayNameと、macOSのアプリメニューに使われるCFBundleNameの両方に同じ名前を設定する。
+それぞれの役割は[AppleのInfo.plistキーの説明](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html)に基づく。
+
+設定と署名上の識別を引き継ぐため、アプリ識別子`info.efcl.quick-translate-input`と実行ファイル名`QuickTranslateInput`を維持する。
+旧名の`dist/Quick Translate Input.app`がある場合は、その署名要件を新しいアプリが満たすことを確認してから、新名の生成先へ置き換える。
+配置に失敗した場合は旧名の場所へ戻す。新旧両方がある場合は、自動で版を選ばず理由を表示して停止する。
+名前の変更では起動場所も変わるため、変更後にアクセシビリティ権限を確認する。
+
 ### 更新前の検証
 
-ビルドスクリプトは、Quick Translate Inputの起動中にはアプリを更新せず、終了してからの再実行を求める。
+ビルドスクリプトは、Quick Input Translatorの起動中にはアプリを更新せず、終了してからの再実行を求める。
 起動中のbundle差し替え後に、事前の権限確認と実際のAX読み取りが食い違う状態を避けるため。
 
 更新するアプリは、一時ディレクトリで署名と検証を済ませる。
@@ -442,8 +453,39 @@ AXSecureTextFieldの判定を先に行うことで、取得後に本文の種類
 その後の更新では、既定の署名要件で同じアプリとして識別できる状態を保つ。
 この方法は、[Appleの署名要件の説明](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)と[アプリ更新の識別についての説明](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)に基づく。
 
-配布範囲は、このMacでのローカル実行とする。
-Developer ID署名と公証による配布は対象外とする。
+### 配布用のパッケージ
+
+GitHub Releasesでは、Apple Silicon・macOS 26以降向けのZIPとSHA-256チェックサムを配布する。
+配布用スクリプトは、一時ディレクトリにアプリを組み立てて明示的に仮署名する。
+ローカルビルドの証明書付きアプリを更新せず、証明書が見つからない場合の代替経路としても使わない。
+ZIPを展開して署名とバージョンを再検証してから配布物を確定する。
+
+アプリのバージョンはVERSIONから読み取り、Info.plistとタグに使う。
+ローカルビルドと配布用ビルドは同じアプリ組み立て処理を使い、表示名や識別子の食い違いを防ぐ。
+Developer ID署名と公証は行わない。仮署名での更新では、権限の維持を保証せず、再登録が必要になる場合をREADMEで案内する。
+
+### リリースPRとタグ
+
+Create Release PRをmainで手動実行すると、指定された新しいバージョンを検証し、VERSIONだけを更新するPRを作成する。
+バージョンは数字3組とし、現在以下の値や不正な文字列は変更前に拒否する。
+
+Releaseは、同じリポジトリのrelease/vで始まるブランチからmainへのPRがマージされた場合と、vで始まるタグがpushされた場合に実行する。
+PRではブランチ名とVERSIONの一致を確認し、マージしたコミットにタグを付ける。
+既存タグを使う場合は、そのコミットも一致することを確認する。
+タグの作成にGITHUB_TOKENを使うため、タグ作成後のビルドは同じworkflowの後続ジョブで行う。
+別workflowの起動に依存しない判断は、[GitHubのworkflow起動の説明](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)に基づく。
+
+ビルドはmacos-26ランナーでテストを実行してからパッケージを作成する。
+書き込み権限はタグ作成・PR作成・公開に必要なジョブへ限定し、ビルドは読み取り権限だけで行う。
+公開ジョブはZIPとチェックサムをドラフトへ追加した後に公開する。
+失敗時はドラフトのまま再実行でき、公開済みのリリースは上書きしない。
+既存タグを指定する手動実行も設け、タグとVERSIONの一致を確認して同じ処理へ進める。
+
+### インストール
+
+READMEは、バージョンを指定してcurlでZIPとチェックサムを取得し、照合後に利用者のApplicationsディレクトリへ展開する手順を案内する。
+xattrはそのアプリのcom.apple.quarantineだけを削除し、OS全体の設定は変更しない。
+更新時は利用者がアプリを終了してから同じ操作を行う。
 
 ## 検討した代替手段
 
