@@ -228,12 +228,7 @@ enum ExternalInputError: LocalizedError {
     }
 
     private func focusedElement(in pid: pid_t) throws -> AXUIElement {
-        let application = AXUIElementCreateApplication(pid)
-        AXUIElementSetMessagingTimeout(application, 0.5)
-        guard let value = attribute(application, kAXFocusedUIElementAttribute), CFGetTypeID(value) == AXUIElementGetTypeID() else {
-            throw ExternalInputError.focus
-        }
-        return unsafeDowncast(value, to: AXUIElement.self)
+        try AXFocusedElement.read(in: pid)
     }
 
     private func attribute(_ element: AXUIElement, _ name: String, reportFailure: Bool = true) -> CFTypeRef? {

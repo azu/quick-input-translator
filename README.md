@@ -13,6 +13,8 @@ open "dist/Quick Translate Input.app"
 
 The build automatically uses your Apple Development certificate when exactly one is available. Otherwise, set `CODE_SIGN_IDENTITY` to the certificate’s ID. Builds keep the same signing identity, bundle identifier, and app location so Accessibility permission can survive updates. Switching from an older ad-hoc build requires granting permission once again.
 
+Quit Quick Translate Input before rebuilding. The build stops if the app is still running, so it doesn’t replace the bundle underneath a process using Accessibility access. Open the new build after the update completes.
+
 Open **Settings…** from the menu bar icon, or press **Command+,** while the app is active.
 
 1. Choose the **From** and **To** languages. Available choices come from Apple’s Translation framework. The source starts as Japanese; the target defaults to your OS language. Choose **System language** to follow your OS preferences, or select a specific language. If no preferred OS language is supported, English is used. Your choices are saved between launches.

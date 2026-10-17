@@ -3,6 +3,22 @@ set -euo pipefail
 project_dir="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$project_dir"
 
+# Replacing the bundle of a running process can leave trust preflight and AX
+# requests disagreeing. Require the app to exit before updating its bundle.
+ensure_app_stopped() {
+    if pgrep -x QuickTranslateInput >/dev/null; then
+        printf '%s\n' 'Quick Translate Inputを終了してからビルドしてください。起動中のアプリは更新しません。' >&2
+        exit 1
+    else
+        local process_check_status=$?
+        if [[ "$process_check_status" != 1 ]]; then
+            printf '%s\n' 'アプリの起動状態を確認できないため、更新を中止しました。' >&2
+            exit 1
+        fi
+    fi
+}
+ensure_app_stopped
+
 # A real signing identity keeps the designated requirement stable across builds.
 # Never fall back to ad-hoc signing: that would invalidate Accessibility grants.
 if [[ -n "${CODE_SIGN_IDENTITY:-}" ]]; then
@@ -51,6 +67,7 @@ plutil -insert QTIBuildID -string "$(date -u '+%Y%m%dT%H%M%SZ')" "$staged_bundle
 codesign --force --sign "$signing_identity" --timestamp=none "$staged_bundle"
 codesign --verify --strict "$staged_bundle"
 
+ensure_app_stopped
 if [[ -d "$bundle_dir" ]]; then
     previous_requirement="$(codesign -d -r- "$bundle_dir" 2>&1 | sed -n 's/^#\{0,1\} *designated => //p')"
     if [[ -z "$previous_requirement" ]]; then
