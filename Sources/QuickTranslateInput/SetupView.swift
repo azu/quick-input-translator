@@ -5,6 +5,7 @@ import Carbon
 @preconcurrency import ApplicationServices
 
 @MainActor final class AppModel: ObservableObject {
+    @Published var sample = "こんにちは。今日は良い天気です。"
     @Published var status = "Type a line-end or whole-input trigger to translate."
     @Published var shortcutReady = false
     @Published var modelStatus = "Checking languages…"
@@ -139,7 +140,6 @@ struct SetupView: View {
     @State private var configuration: TranslationSession.Configuration?
     @State private var preparing = false
     @State private var preparationSelection: [String]?
-    @State private var sample = "こんにちは。今日は良い天気です。"
 
     var body: some View {
         ScrollView {
@@ -220,7 +220,7 @@ struct SetupView: View {
                         Spacer()
                         Text("⌃⇧A selects the current line").font(.callout).foregroundStyle(.secondary)
                     }
-                    TextEditor(text: $sample)
+                    TextEditor(text: $model.sample)
                         .font(.system(size: 14))
                         .scrollContentBackground(.hidden)
                         .padding(10)
@@ -255,7 +255,6 @@ struct SetupView: View {
         }
         .frame(width: 620, height: 690)
         .background(Color(nsColor: .windowBackgroundColor))
-        .task { await model.loadLanguages() }
         .task(id: model.selectionID) { await model.refresh() }
         .translationTask(configuration) { @Sendable session in
             do {

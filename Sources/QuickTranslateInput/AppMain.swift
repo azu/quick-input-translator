@@ -19,11 +19,12 @@ import TranslationCore
     private var hotKey: GlobalHotKey?
     private var typingMonitor: TypingMonitor?
     private var statusItem: NSStatusItem?
-    private var window: NSWindow?
+    private lazy var settings = SettingsWindow(model: model)
     private var task: Task<Void, Never>?
     private var pendingTrigger: Task<Void, Never>?
     private var pendingID = UUID()
     private var permissionWatch: Task<Void, Never>?
+    private var languageLoad: Task<Void, Never>?
     private let hud = TranslationHUD()
     private let pairMenuItem = NSMenuItem(title: "Translation", action: nil, keyEquivalent: "")
     private let statusMenuItem = NSMenuItem(title: "Getting ready", action: nil, keyEquivalent: "")
@@ -88,6 +89,11 @@ import TranslationCore
         } catch {
             model.setStatus(error.localizedDescription)
         }
+        languageLoad = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { languageLoad = nil }
+            await model.loadLanguages()
+        }
         showSetup()
     }
 
@@ -122,16 +128,7 @@ import TranslationCore
     }
 
     @objc private func showSetup() {
-        if window == nil {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 690),
-                                  styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            window.title = "Quick Input Translator Settings"
-            window.contentView = NSHostingView(rootView: SetupView(model: model))
-            window.isReleasedWhenClosed = false
-            window.center()
-            self.window = window
-        }
-        window?.makeKeyAndOrderFront(nil)
+        settings.show()
         NSApplication.shared.activate()
     }
 
@@ -249,6 +246,7 @@ import TranslationCore
 
     func applicationWillTerminate(_ notification: Notification) {
         permissionWatch?.cancel()
+        languageLoad?.cancel()
         task?.cancel()
         cancelPendingTrigger()
         typingMonitor?.stop()
