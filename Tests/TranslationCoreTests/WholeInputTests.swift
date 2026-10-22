@@ -74,6 +74,46 @@ func wholeInputAcceptsJapaneseCompositionAndEllipsis(marker: String) throws {
     }
 }
 
+@Test func detectorRoutesJapaneseAndMixedMarkersToTheirConfiguredScope() {
+    for line in TranslationTrigger.allCases {
+        for whole in TranslationTrigger.allCases where line != whole {
+            for (trigger, expected) in [(line, CaptureMode.triggeredLine(line)), (whole, .triggeredField(whole))] {
+                for pattern in 0..<8 {
+                    var detector = TranslationTriggerDetector(line: line, wholeInput: whole)
+                    for index in 0..<5 {
+                        let character = pattern & (1 << (index % 3)) == 0 ? trigger.character : trigger.japaneseInputCharacter
+                        #expect(detector.observe(character) == (index == 2 ? expected : nil))
+                    }
+                    #expect(detector.observe("a") == nil)
+                    #expect(detector.observe(trigger.japaneseInputCharacter) == nil)
+                    detector.reset()
+                    #expect(detector.observe(trigger.japaneseInputCharacter) == nil)
+                    #expect(detector.observe(trigger.character) == nil)
+                    #expect(detector.observe(trigger.japaneseInputCharacter) == expected)
+                }
+            }
+        }
+    }
+}
+
+@Test(arguments: TranslationTrigger.allCases)
+func wholeInputAcceptsJapaneseMarkersWithoutChangingInteriorText(trigger: TranslationTrigger) throws {
+    let source = "😀ＡＢＣ\r\n途中の記号" + trigger.japaneseInputMarker + "です。\n\n最後の段落"
+    for marker in [trigger.japaneseInputMarker, trigger.character + trigger.japaneseInputCharacter + trigger.character] {
+        let text = source + marker
+        let selection = NSRange(location: source.utf16.count, length: marker.utf16.count)
+        let target = try TextTarget(text: text, selection: selection, mode: .triggeredField(trigger))
+        #expect(target.sourceText == source)
+        #expect(target.triggerRange == selection)
+        #expect(target.replacementRange == NSRange(location: 0, length: text.utf16.count))
+        #expect(target.replacing(with: "Translation") == "Translation")
+        let followedByNewline = text + "\n後の行"
+        #expect(throws: InputError.noTrigger) {
+            try TextTarget(text: followedByNewline, selection: selection, mode: .triggeredField(trigger))
+        }
+    }
+}
+
 @Test func wholeInputRangeMapsAcrossChromiumParagraphSeparators() throws {
     let text = "😀最初\n\n最後:::"
     let indexed = text.replacingOccurrences(of: "\n", with: "")

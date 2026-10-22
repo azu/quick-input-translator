@@ -10,7 +10,8 @@ import TranslationCore
     func textDidChange(_ notification: Notification) { changes += 1 }
 }
 
-@Test @MainActor func wholeInputReplacementUndoesOnceWithoutUndoingEarlierTyping() throws {
+@Test(arguments: [":::", "：：：", ":：:"])
+@MainActor func wholeInputReplacementUndoesOnceWithoutUndoingEarlierTyping(marker: String) throws {
     let view = NSTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
     let delegate = ChangeDelegate()
     delegate.undo.groupsByEvent = false
@@ -20,7 +21,7 @@ import TranslationCore
     view.string = source
     view.setSelectedRange(NSRange(location: source.utf16.count, length: 0))
     delegate.undo.beginUndoGrouping()
-    view.insertText(":::", replacementRange: view.selectedRange())
+    view.insertText(marker, replacementRange: view.selectedRange())
     delegate.undo.endUndoGrouping()
     let original = view.string
     let target = try TextViewInput.capture(view, mode: .triggeredField(.colons))
@@ -31,22 +32,24 @@ import TranslationCore
     #expect(delegate.undo.canUndo)
     delegate.undo.undo()
     #expect(view.string == original)
-    #expect(view.string == source + ":::")
+    #expect(view.string == source + marker)
     #expect(delegate.undo.canUndo)
     delegate.undo.undo()
     #expect(view.string == source)
 }
 
-@Test @MainActor func wholeInputCommitsCompositionAtTheEndOfMultipleLines() throws {
+@Test(arguments: TranslationTrigger.allCases)
+@MainActor func wholeInputCommitsCompositionAtTheEndOfMultipleLines(trigger: TranslationTrigger) throws {
     let view = NSTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
     view.string = "最初の行\n"
     view.setSelectedRange(NSRange(location: view.string.utf16.count, length: 0))
-    view.setMarkedText("日本語。。。", selectedRange: NSRange(location: 6, length: 0),
+    let composition = "日本語" + trigger.japaneseInputMarker
+    view.setMarkedText(composition, selectedRange: NSRange(location: composition.utf16.count, length: 0),
                        replacementRange: NSRange(location: NSNotFound, length: 0))
-    let target = try TextViewInput.capture(view, mode: .triggeredField(.dots))
+    let target = try TextViewInput.capture(view, mode: .triggeredField(trigger))
     #expect(!view.hasMarkedText())
     #expect(target.sourceText == "最初の行\n日本語")
-    #expect(view.string == "最初の行\n日本語。。。")
+    #expect(view.string == "最初の行\n" + composition)
     try TextViewInput.replace(view, target: target, translation: "First line\nJapanese")
     #expect(view.string == "First line\nJapanese")
 }
@@ -64,28 +67,32 @@ import TranslationCore
     #expect(view.selectedRange() == NSRange(location: 10, length: 0))
 }
 
-@Test @MainActor func nativeEditorCommitsJapaneseMarkedTextWithoutReturn() throws {
+@Test(arguments: TranslationTrigger.allCases)
+@MainActor func nativeEditorCommitsJapaneseMarkedTextWithoutReturn(trigger: TranslationTrigger) throws {
     let view = NSTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
     view.string = "前\n"
     view.setSelectedRange(NSRange(location: 2, length: 0))
-    view.setMarkedText("日本語。。。", selectedRange: NSRange(location: 6, length: 0),
+    let composition = "日本語" + trigger.japaneseInputMarker
+    view.setMarkedText(composition, selectedRange: NSRange(location: composition.utf16.count, length: 0),
                        replacementRange: NSRange(location: NSNotFound, length: 0))
     #expect(view.hasMarkedText())
-    let target = try TextViewInput.capture(view, mode: .triggeredLine(.dots))
+    let target = try TextViewInput.capture(view, mode: .triggeredLine(trigger))
     #expect(!view.hasMarkedText())
     #expect(target.sourceText == "日本語")
-    #expect(view.string == "前\n日本語。。。")
+    #expect(view.string == "前\n" + composition)
     try TextViewInput.replace(view, target: target, translation: "Japanese")
     #expect(view.string == "前\nJapanese")
 }
 
-@Test @MainActor func missingTriggerKeepsCompositionMarked() {
+@Test(arguments: TranslationTrigger.allCases)
+@MainActor func missingTriggerKeepsCompositionMarked(trigger: TranslationTrigger) {
     let view = NSTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
-    view.setMarkedText("日本語。。", selectedRange: NSRange(location: 5, length: 0),
+    let composition = "日本語" + String(repeating: trigger.japaneseInputCharacter, count: 2)
+    view.setMarkedText(composition, selectedRange: NSRange(location: composition.utf16.count, length: 0),
                        replacementRange: NSRange(location: NSNotFound, length: 0))
-    #expect(throws: InputError.noTrigger) { try TextViewInput.capture(view, mode: .triggeredLine(.dots)) }
+    #expect(throws: InputError.noTrigger) { try TextViewInput.capture(view, mode: .triggeredLine(trigger)) }
     #expect(view.hasMarkedText())
-    #expect(view.string == "日本語。。")
+    #expect(view.string == composition)
 }
 
 @Test @MainActor func newCompositionPreventsStaleNativeReplacement() throws {

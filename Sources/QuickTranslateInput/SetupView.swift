@@ -182,19 +182,15 @@ struct SetupView: View {
                                   unavailable: model.wholeInputTrigger)
                     Text("Type \(model.trigger.rawValue) at the end of a line. Only that line is replaced.")
                         .font(.callout).foregroundStyle(.secondary)
-                    if model.trigger == .dots {
-                        Text("Also works with 。。。 during Japanese input.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                    Text("Also works with \(model.trigger.japaneseInputMarker) during Japanese input.")
+                        .font(.caption).foregroundStyle(.secondary)
                     triggerPicker("Whole-input trigger",
                                   selection: Binding(get: { model.wholeInputTrigger }, set: { model.setWholeInputTrigger($0) }),
                                   unavailable: model.trigger)
                     Text("Type \(model.wholeInputTrigger.rawValue) at the end of the input field. The entire field is replaced.")
                         .font(.callout).foregroundStyle(.secondary)
-                    if model.wholeInputTrigger == .dots {
-                        Text("Also works with 。。。 during Japanese input.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                    Text("Also works with \(model.wholeInputTrigger.japaneseInputMarker) during Japanese input.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
 
                 section("Access") {

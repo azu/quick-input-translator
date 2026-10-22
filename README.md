@@ -82,7 +82,18 @@ Use the input app’s **Command+Z** immediately after replacement to undo the ed
 
 In Settings, choose **Line-end trigger** and **Whole-input trigger** from `...`, `;;;`, `:::`, and `@@@`. The two choices must be different and are saved between launches. Existing users keep their saved line trigger; the whole-input trigger may start as `@@@` if `:::` was already in use.
 
-For a trigger set to `...`, Japanese IME input `。。。` and automatic substitution to `…` also work. In the built-in field you can type the trigger before confirming Japanese composition; support in other apps depends on what their input fields expose.
+Japanese input also works with the corresponding marker, without changing the trigger setting:
+
+| Trigger setting | Japanese input |
+| --- | --- |
+| `...` | `。。。` |
+| `;;;` | `；；；` |
+| `:::` | `：：：` |
+| `@@@` | `＠＠＠` |
+
+These work for both line and whole-field translation. Half-width and Japanese characters for the same trigger can be mixed, such as `;；;`. Exactly three consecutive characters trigger translation; four or more do not. Only the final marker is removed from the source; the rest of your text is kept as typed.
+
+For `...`, automatic substitution to `…` also works. In the built-in field you can type the trigger before confirming Japanese composition; support in other apps depends on what their input fields expose.
 
 Type the trigger directly. Pasting a trigger, typing it in the middle of a line, or typing one, two, or four or more repeated characters does not start translation.
 

@@ -35,23 +35,26 @@ import Testing
     }
 }
 
-@Test @MainActor func wholeInputWorkflowTranslatesOneStringAndReplacesOnce() async throws {
+@Test(arguments: TranslationTrigger.allCases)
+@MainActor func wholeInputWorkflowTranslatesOneStringAndReplacesOnce(trigger: TranslationTrigger) async throws {
     let input = StubInput(), engine = StubEngine()
-    input.text = "前の行\n\n日本語:::"
+    input.text = "前の行\n\n日本語" + trigger.japaneseInputMarker
     input.selection = NSRange(location: input.text.utf16.count, length: 0)
     engine.result = "First line\n\nJapanese"
     let workflow = TranslationWorkflow(engine: engine, input: input)
-    #expect(try await workflow.perform(mode: .triggeredField(.colons)))
+    #expect(try await workflow.perform(mode: .triggeredField(trigger)))
     #expect(engine.source == "前の行\n\n日本語")
     #expect(engine.calls == 1)
     #expect(input.text == engine.result)
     #expect(input.replacements == 1)
 }
 
-@Test @MainActor func wholeInputFailureAndChangedSelectionPreserveOriginal() async {
+@Test(arguments: TranslationTrigger.allCases)
+@MainActor func wholeInputFailureAndChangedSelectionPreserveOriginal(trigger: TranslationTrigger) async {
     for changeSelection in [true, false] {
         let input = StubInput(), engine = StubEngine()
-        input.text = "前\n日本語:::"
+        let original = "前\n日本語" + trigger.japaneseInputMarker
+        input.text = original
         input.selection = NSRange(location: input.text.utf16.count, length: 0)
         if changeSelection {
             engine.duringTranslation = { input.selection = NSRange(location: 0, length: 0) }
@@ -60,9 +63,9 @@ import Testing
         }
         let workflow = TranslationWorkflow(engine: engine, input: input)
         await #expect(throws: changeSelection ? InputError.changed : InputError.unsupported) {
-            try await workflow.perform(mode: .triggeredField(.colons))
+            try await workflow.perform(mode: .triggeredField(trigger))
         }
-        #expect(input.text == "前\n日本語:::")
+        #expect(input.text == original)
         #expect(input.replacements == 0)
     }
 }
