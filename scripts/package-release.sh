@@ -16,11 +16,33 @@ keychain="$staging_dir/signing.keychain-db"
 previous_keychains=()
 while IFS= read -r path; do previous_keychains+=("$path"); done < <(security list-keychains -d user | sed 's/^[[:space:]]*"//; s/"[[:space:]]*$//')
 cleanup() {
-    if [[ "${trusted_in_ci:-0}" == 1 ]]; then
-        sudo security remove-trusted-cert -d "$staging_dir/certificate.pem" >/dev/null 2>&1 || true
+    if [[ "${GITHUB_ACTIONS:-false}" == true ]]; then
+        # macOS trust/keychain services can wait indefinitely on a headless
+        # runner even after signing succeeds. Bound each cleanup operation;
+        # the disposable hosted runner is destroyed after the job as well.
+        python3 - "$keychain" "$staging_dir/certificate.pem" "${trusted_in_ci:-0}" "${previous_keychains[@]}" <<'PY'
+import subprocess, sys
+keychain, certificate, trusted, *previous = sys.argv[1:]
+commands = []
+if trusted == "1":
+    commands.append(("remove temporary certificate trust", ["sudo", "-n", "security", "remove-trusted-cert", "-d", certificate]))
+commands.extend([
+    ("restore keychain search list", ["security", "list-keychains", "-d", "user", "-s", *previous]),
+    ("delete temporary keychain", ["security", "delete-keychain", keychain]),
+])
+for label, command in commands:
+    print(f"Cleanup: {label}", flush=True)
+    try:
+        result = subprocess.run(command, timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result.returncode:
+            print(f"::warning::Could not {label}; the hosted runner will be discarded.", flush=True)
+    except subprocess.TimeoutExpired:
+        print(f"::warning::Timed out attempting to {label}; the hosted runner will be discarded.", flush=True)
+PY
+    else
+        security list-keychains -d user -s "${previous_keychains[@]}" >/dev/null 2>&1 || true
+        security delete-keychain "$keychain" >/dev/null 2>&1 || true
     fi
-    security list-keychains -d user -s "${previous_keychains[@]}" >/dev/null 2>&1 || true
-    security delete-keychain "$keychain" >/dev/null 2>&1 || true
     rm -rf "$staging_dir"
 }
 trap cleanup EXIT

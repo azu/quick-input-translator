@@ -21,7 +21,7 @@ open "/Applications/Quick Input Translator.app"
 
 The commands install and open `/Applications/Quick Input Translator.app`. The app is self-signed and isn’t notarized; the `xattr` command removes its quarantine attribute so macOS can open it. You do not need to import its signing certificate.
 
-**Upgrading from v1.0.x?** Use the same commands once to install v1.1.0 or later. Then remove the old entry and add `/Applications/Quick Input Translator.app` again in **System Settings → Privacy & Security → Accessibility**. The signing identity changes in this release, so this one-time permission reset is necessary. Future releases use the fixed identity; permission retention across a full update still needs real-device verification.
+**Upgrading from v1.0.x?** Use the same commands once to install v1.1.1 or later. Then remove the old entry and add `/Applications/Quick Input Translator.app` again in **System Settings → Privacy & Security → Accessibility**. The signing identity changes in this release, so this one-time permission reset is necessary. Future releases use the fixed identity; permission retention across a full update still needs real-device verification.
 
 ## First-time setup
 
@@ -88,7 +88,7 @@ Type the trigger directly. Pasting a trigger, typing it in the middle of a line,
 
 ## Updates
 
-Starting with v1.1.0, release builds use [Sparkle](https://sparkle-project.org/documentation/customization/) to check for updates daily, download verified updates in the background, and normally install them when you quit. No install command is needed for later in-app updates.
+Starting with v1.1.1, release builds use [Sparkle](https://sparkle-project.org/documentation/customization/) to check for updates daily, download verified updates in the background, and normally install them when you quit. No install command is needed for later in-app updates.
 
 Open the menu bar menu to choose:
 
@@ -197,7 +197,7 @@ Set these repository Actions secrets using the generated files:
 | `CODE_SIGN_P12_PASSWORD` | Contents of `.update-signing/p12-password` |
 | `SPARKLE_PRIVATE_KEY` | Contents of `.update-signing/sparkle-private-key` |
 
-The build checks the certificate against the committed SHA-256 fingerprint and verifies the archive signature against the committed Sparkle public key. Missing or different keys stop the release. GitHub-hosted runners trust the certificate only for code signing and remove that trust at the end of packaging. For local packaging, run `bash scripts/trust-release-certificate.sh` once; macOS may ask you to authenticate. This adds only code-signing trust on the authoring Mac. Users installing the app do not need to import the certificate.
+The build checks the certificate against the committed SHA-256 fingerprint and verifies the archive signature against the committed Sparkle public key. Missing or different keys stop the release. GitHub-hosted runners trust the certificate only for code signing. Cleanup attempts to remove that trust and the temporary keychain with a time limit for each operation; the disposable runner is destroyed after the job. For local packaging, run `bash scripts/trust-release-certificate.sh` once; macOS may ask you to authenticate. This adds only code-signing trust on the authoring Mac. Users installing the app do not need to import the certificate.
 
 To package a release locally without modifying the certificate-signed app in `dist`:
 
