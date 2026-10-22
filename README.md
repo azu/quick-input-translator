@@ -1,14 +1,16 @@
 # Quick Input Translator
 
-Translate the line or entire input field you’re writing without leaving your app. Type a trigger at the end of the line or field, and Quick Input Translator replaces it with a translation using Apple’s Translation framework.
+Translate what you’re writing, right in the input field. This macOS menu bar app uses Apple’s on-device Translation framework and replaces your text with the translation. It never sends or posts the result.
+
+With the default settings, type `...` to translate the current line, or `:::` to translate the entire input field. You can choose the source language, target language, and both triggers.
 
 ![Quick Input Translator settings with language and translation trigger options](docs/images/settings.png)
 
 ## Install
 
-Requires an Apple Silicon Mac running macOS 26 or later. New release builds use a fixed self-signed certificate and aren’t notarized. The commands below download the app and remove its quarantine attribute so it can be opened. Xcode and an Apple Development certificate aren’t needed for a release download.
+Requires an **Apple Silicon Mac with macOS 26 or later**. Release downloads do not require Xcode, a developer certificate, or a translation API key.
 
-Quit any running copy of Quick Input Translator and run these commands to install the latest release:
+Quit any running copy of Quick Input Translator, then paste these commands into Terminal:
 
 ```sh
 curl -fL https://github.com/azu/quick-input-translator/releases/latest/download/quick-input-translator-macos-arm64.zip -o "$TMPDIR/quick-input-translator.zip" &&
@@ -17,9 +19,117 @@ xattr -dr com.apple.quarantine "/Applications/Quick Input Translator.app" &&
 open "/Applications/Quick Input Translator.app"
 ```
 
-The app is installed in `/Applications`. The first move from an older ad-hoc signed release to the fixed-certificate release requires removing and re-adding the app in **System Settings → Privacy & Security → Accessibility**. Later releases keep the same signing identity and bundle identifier to preserve permissions and saved settings. Permission retention across a real update still needs end-to-end verification.
+The commands install and open `/Applications/Quick Input Translator.app`. The app is self-signed and isn’t notarized; the `xattr` command removes its quarantine attribute so macOS can open it. You do not need to import its signing certificate.
 
-New release builds include automatic updates through Sparkle. They check daily, download verified updates in the background, and normally install them when you quit. Use **Check for Updates…** in the menu bar for an immediate check and an option to install and relaunch. **Automatically Check for Updates** and **Automatically Install Updates** can be changed independently; your choices are saved. Initial installation still requires the commands above. Older releases without Sparkle must be updated manually once.
+**Upgrading from v1.0.x?** Use the same commands once to install v1.1.0 or later. Then remove the old entry and add `/Applications/Quick Input Translator.app` again in **System Settings → Privacy & Security → Accessibility**. The signing identity changes in this release, so this one-time permission reset is necessary. Future releases use the fixed identity; permission retention across a full update still needs real-device verification.
+
+## First-time setup
+
+Settings open when the app starts. To reopen them, click the menu bar icon and choose **Settings…**, or press **Command+,** while the app is active.
+
+1. Set **From** and **To** to different languages. For a first test, choose Japanese → English.
+2. Click **Prepare Languages** if the app needs a language model. Complete Apple’s download dialog and wait until the app says it is ready.
+3. Try translating in the **Try it** field in Settings using the examples below. This field works without Accessibility permission.
+4. To translate in other apps, click **Allow Access** and enable Quick Input Translator in **System Settings → Privacy & Security → Accessibility**. Return to the app; permission changes are detected automatically.
+
+Your language choices are saved. The source language initially defaults to Japanese; **To → System language** follows your supported OS language preferences, falling back to English when needed. The interface stays in English regardless of the translation language.
+
+## Translate while writing
+
+Click inside a supported editable text field and type your text normally. You do not need to select the text or press a translation shortcut.
+
+| What to translate | Default trigger | Where to type it | What gets replaced |
+| --- | --- | --- | --- |
+| Current line | `...` | At the end of that line | Only that line; surrounding lines stay unchanged |
+| Entire input field | `:::` | At the very end of the field | The whole draft, including multiple lines |
+
+### Translate one line
+
+With **From → Japanese** and **To → English**, type this in the test field or a supported input field:
+
+```text
+こんにちは。今日は良い天気です。...
+```
+
+Typing the final dot starts translation. The app replaces the line with English and removes the trigger. A visually wrapped line still counts as one line until you insert a line break.
+
+### Translate a whole draft
+
+Write your draft across several lines, then type `:::` at the very end:
+
+```text
+こんにちは。
+明日の打ち合わせは10時からです。:::
+```
+
+The app translates the entire field in one request and replaces it in place. A whole-input trigger in an earlier line does not start a translation.
+
+### While translation is running
+
+A small spinner appears near the trigger, followed briefly by a checkmark when replacement succeeds. Wait for completion before typing more or switching fields. Changing the text, selection, focused field, language, or trigger can cancel the replacement.
+
+If translation fails, the app displays a reason. Check the field before retrying: a failure to confirm a paste does not always mean nothing was pasted. The app does not retry or roll back an unconfirmed paste.
+
+The translated text is still your draft. Review it and send or save it yourself.
+
+### Undo and shortcuts
+
+Use the input app’s **Command+Z** immediately after replacement to undo the edit. Restoring the original text, including the trigger, as one edit is tested in the built-in field; Undo in other apps depends on their text editor and needs verification.
+
+**Control+Shift+A** only selects the current logical line. It does not translate, and you do not need to use it before typing a trigger. An existing selection is preserved.
+
+### Change the triggers
+
+In Settings, choose **Line-end trigger** and **Whole-input trigger** from `...`, `;;;`, `:::`, and `@@@`. The two choices must be different and are saved between launches. Existing users keep their saved line trigger; the whole-input trigger may start as `@@@` if `:::` was already in use.
+
+For a trigger set to `...`, Japanese IME input `。。。` and automatic substitution to `…` also work. In the built-in field you can type the trigger before confirming Japanese composition; support in other apps depends on what their input fields expose.
+
+Type the trigger directly. Pasting a trigger, typing it in the middle of a line, or typing one, two, or four or more repeated characters does not start translation.
+
+## Updates
+
+Starting with v1.1.0, release builds use [Sparkle](https://sparkle-project.org/documentation/customization/) to check for updates daily, download verified updates in the background, and normally install them when you quit. No install command is needed for later in-app updates.
+
+Open the menu bar menu to choose:
+
+| Menu item | What it does |
+| --- | --- |
+| **Check for Updates…** | Check now and choose whether to install and relaunch |
+| **Automatically Check for Updates** | Turn scheduled checks on or off |
+| **Automatically Install Updates** | Turn automatic download and installation on or off; available while automatic checking is enabled |
+
+Your choices are saved. If installation requires authorization, the update window explains the next step. Development builds do not install release updates.
+
+## Troubleshooting
+
+| Problem | What to check |
+| --- | --- |
+| The test field works, but other apps do not | Enable Accessibility for the copy in `/Applications`. After upgrading from v1.0.x, remove and re-add that entry once. |
+| Nothing happens after typing a trigger | Check the trigger selected in Settings and type it at the end of the line or field. A pasted trigger does not count. |
+| The language is not ready | Choose different supported languages, then click **Prepare Languages** and complete the model download. |
+| Triggers are not detected outside Settings | Expand **Diagnostics** and check trigger monitoring and Secure Input. Secure Input can block monitoring in other apps. |
+| The app reports a replacement failure | Inspect the input field and clipboard before retrying. Keep the same field focused until the operation finishes. |
+
+### Supported input fields
+
+The app needs an editable field that exposes its text and selection through macOS Accessibility. Password fields, read-only content, and editors that do not expose this information are unsupported. Terminal input support is incomplete: visible screen text does not reliably identify the editable command buffer.
+
+Line translation and replacement have been verified in the built-in field and a standard multiline input in Arc. Whole-input translation and Undo are covered by native-editor tests, but whole-input replacement and Undo in external apps still need end-to-end verification. Chrome, Slack, and VS Code have not been verified. The paragraph-coordinate correction for richer browser editors has automated tests; its end-to-end verification is still pending.
+
+### Clipboard and privacy
+
+Translation uses Apple’s on-device Translation framework. Language models are prepared separately; the app does not start a model download while you are typing in another app.
+
+Replacement in other apps temporarily places the translation on the clipboard. After a confirmed paste, the previous clipboard formats are restored unless you copied something else in the meantime. If the paste cannot be confirmed, the translation stays on the clipboard unless another copy replaced it. Clipboard managers may observe this temporary content. The built-in test field does not use the clipboard.
+
+Logs record operation IDs, processing stages, app identifiers, numeric ranges, OS return codes, and replacement status. They do not record source text, translations, clipboard contents, or keystroke history. To inspect events from the last 15 minutes, or follow them while reproducing a problem:
+
+```sh
+bash scripts/logs.sh
+bash scripts/logs.sh --stream
+```
+
+Release updates use a fixed self-signed certificate, plus Ed25519 signatures for the archive and update feed. Local builds use your Apple Development certificate and refuse to silently fall back to ad-hoc signing. Developer ID signing and notarization are not set up.
 
 ## Build from source
 
@@ -35,63 +145,6 @@ The build automatically uses your Apple Development certificate when exactly one
 The first build after the rename migrates `dist/Quick Translate Input.app` to `dist/Quick Input Translator.app` after checking the signing requirement. Your saved settings use the same bundle identifier; check Accessibility access after this one-time location change.
 
 Quit Quick Input Translator before rebuilding. The build stops if the app is still running, so it doesn’t replace the bundle underneath a process using Accessibility access. Open the new build after the update completes.
-
-## Set up
-
-Open **Settings…** from the menu bar icon, or press **Command+,** while the app is active.
-
-1. Choose the **From** and **To** languages. Available choices come from Apple’s Translation framework. The source starts as Japanese; the target defaults to your OS language. Choose **System language** to follow your OS preferences, or select a specific language. If no preferred OS language is supported, English is used. Your choices are saved between launches.
-2. Click **Prepare Languages** if a download is required. Apple’s system dialog handles the download. Choose different source and target languages; unsupported pairs aren’t translated.
-3. Allow **Accessibility** access to use the tool in other apps. Permission changes are detected automatically. The built-in test field works without this permission.
-4. Choose a **Line-end trigger** and a **Whole-input trigger** from `...`, `;;;`, `:::`, and `@@@`. They must be different. A new setup defaults to `...` for a line and `:::` for the whole field. An existing line trigger is preserved; if it is already `:::`, the new whole-input trigger starts as `@@@`.
-
-The interface and this README are in English. The target language setting only controls translations.
-
-## Translate while writing
-
-Type the selected trigger at the end of a line. The app translates that line into your chosen target language, removes the trigger, and preserves surrounding lines. It never sends or posts your text.
-
-To translate a multiline draft, type the **Whole-input trigger** at the very end of the input field. The app passes the entire draft to the translation engine in one request, removes only the final trigger, and replaces the field in place. A whole-input trigger in an earlier line doesn’t start a translation. You don’t need to select text or switch modes.
-
-Use the input app’s **Command+Z** immediately after replacement to undo it. Undo should restore the original field, including the trigger, as one edit. This is tested in the built-in editor; Undo behavior in external apps needs verification for each input field.
-
-With `...` selected, Japanese IME input `。。。` and automatic substitution to `…` also work. In the built-in test field, you can type the trigger before confirming Japanese composition; no Enter key is sent. Composition support in other apps depends on the information their input fields expose.
-
-A small spinner appears above the trigger during translation, then briefly becomes a checkmark. Failures display a reason. If the trigger’s position is unavailable, the indicator uses the cursor or pointer area instead.
-
-**Control+Shift+A** selects the current logical line without translating it. An existing selection is preserved. You don’t need to select a line before translating.
-
-The app doesn’t translate one or two trigger characters, four or more repeated trigger characters, triggers in the middle of a line, or triggers inserted by pasting. Wrapped text remains part of the same line until a line break.
-
-Changing the source language, target language, or either trigger cancels an in-progress translation. Language models are prepared separately from translation; the app doesn’t start a download while you’re typing in another app.
-
-## Input fields and limitations
-
-The tool uses macOS Accessibility APIs to read text and selection, select the target range, and paste into the focused app. Password fields, read-only content, disconnected selections, and fields that don’t expose the required information aren’t supported.
-
-Line translation and replacement have been verified in the built-in test field and a standard multiline input in Arc, including preservation of surrounding lines. Whole-input translation is covered by tests using the real Apple model and native text-view replacement, with a separate native Undo test. Whole-input replacement and Undo in external apps still need end-to-end verification. The paragraph-coordinate correction for richer browser editors has automated tests; end-to-end verification of that correction is still pending. Chrome, Slack, and VS Code haven’t been verified.
-
-Terminal support is incomplete. Reading a terminal’s screen text or selection doesn’t establish the boundaries of its editable input buffer, so terminal input can’t currently be treated as an ordinary text field.
-
-If the text, selection, or focused field changes during translation, replacement stops. After requesting a paste, the app checks the full text against the expected result. If it can’t confirm the replacement, it reports a failure without retrying or rolling back. Check the field before trying again. A focus change immediately after the final check remains a possible race, so let the operation finish before switching fields.
-
-Pasting temporarily places the translation on the clipboard. After successful replacement, the app restores the original clipboard formats unless you copied something else in the meantime. If replacement can’t be confirmed, the translation remains on the clipboard unless another copy replaced it. Clipboard managers may observe this temporary content. Translation in the built-in test field doesn’t use the clipboard.
-
-## Diagnostics and privacy
-
-Expand **Diagnostics** in Settings to check shortcut registration, trigger monitoring, the time of the last input event from another app, and Secure Input status. Secure Input can block trigger detection in other apps.
-
-To inspect diagnostic events from the last 15 minutes:
-
-```sh
-bash scripts/logs.sh
-# Follow events while reproducing a problem:
-bash scripts/logs.sh --stream
-```
-
-Logs record operation IDs, processing stages, app identifiers, numeric ranges, OS return codes, and whether replacement matched the expected result. Source text, translations, clipboard contents, and keystroke history aren’t logged or saved.
-
-Local builds use your Apple Development certificate and refuse to silently switch to ad-hoc signing. Release ZIPs use a pinned self-signed certificate. Update archives and the update feed also have Ed25519 signatures verified by Sparkle before installation. Local builds do not enable release updates. Developer ID signing and notarization aren’t set up.
 
 ## Development
 
