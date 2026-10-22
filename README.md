@@ -97,6 +97,8 @@ Punctuation already in your text is kept. For example, if you confirm `文章。
 
 For `...`, automatic substitution to `…` also works. In the built-in field you can type the trigger before confirming Japanese composition; support in other apps depends on what their input fields expose.
 
+Translation keeps your original line breaks and blank lines, including a final newline. Each source line is translated separately; extra line breaks in a translated line are joined with spaces. All translated lines are applied together, so a failed or empty translation leaves the entire original text unchanged. Translating lines separately can reduce context across line breaks.
+
 Type the trigger directly. Pasting a trigger, typing it in the middle of a line, or typing one, two, or four or more repeated characters does not start translation.
 
 ## Updates

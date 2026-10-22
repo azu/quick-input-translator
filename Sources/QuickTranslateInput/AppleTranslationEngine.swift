@@ -21,10 +21,21 @@ import TranslationCore
         case .unsupported: throw ModelError.unsupported
         @unknown default: throw ModelError.unsupported
         }
-        let session = TranslationSession(installedSource: pair.source, target: pair.target)
-        let result = try await session.translate(text).targetText
+        let layout = TranslationLayout(text)
+        guard !layout.lines.isEmpty else { return text }
+        let translated = try await Self.translate(lines: layout.lines, languages: pair)
+        try Task.checkCancellation()
+        let result = try layout.applying(translated)
         Diagnostics.event("translation.finished", "result_length=\(result.utf16.count)")
         return result
+    }
+
+    // Keep the SDK's non-Sendable session and requests in one isolation region.
+    nonisolated private static func translate(lines: [String], languages: TranslationLanguages) async throws -> [String] {
+        try Task.checkCancellation()
+        let session = TranslationSession(installedSource: languages.source, target: languages.target)
+        let requests = lines.map { TranslationSession.Request(sourceText: $0) }
+        return try await session.translations(from: requests).map(\.targetText)
     }
 }
 
