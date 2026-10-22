@@ -11,6 +11,8 @@ if [[ -e "$staged_bundle" ]]; then
 fi
 mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources"
 cp "$binary_path" "$staged_bundle/Contents/MacOS/QuickTranslateInput"
+mkdir -p "$staged_bundle/Contents/Frameworks"
+ditto "$(bash "$project_dir/scripts/sparkle-path.sh")" "$staged_bundle/Contents/Frameworks/Sparkle.framework"
 bash "$project_dir/scripts/build-icon.sh" "$staged_bundle/Contents/Resources/AppIcon.icns"
 cat > "$staged_bundle/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -32,3 +34,13 @@ PLIST
 plutil -replace CFBundleShortVersionString -string "$version" "$staged_bundle/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$version" "$staged_bundle/Contents/Info.plist"
 plutil -insert QTIBuildID -string "$(date -u '+%Y%m%dT%H%M%SZ')" "$staged_bundle/Contents/Info.plist"
+if [[ "${QTI_RELEASE_BUILD:-0}" == 1 ]]; then
+    public_key="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sparklePublicKey"])' "$project_dir/config/update-signing.json")"
+    plutil -insert QTIReleaseChannel -string signed-release "$staged_bundle/Contents/Info.plist"
+    plutil -insert SUFeedURL -string 'https://github.com/azu/quick-input-translator/releases/latest/download/appcast.xml' "$staged_bundle/Contents/Info.plist"
+    plutil -insert SUPublicEDKey -string "$public_key" "$staged_bundle/Contents/Info.plist"
+    for key in SUEnableAutomaticChecks SUAutomaticallyUpdate SUVerifyUpdateBeforeExtraction SURequireSignedFeed; do
+        plutil -insert "$key" -bool true "$staged_bundle/Contents/Info.plist"
+    done
+    plutil -insert SUEnableSystemProfiling -bool false "$staged_bundle/Contents/Info.plist"
+fi

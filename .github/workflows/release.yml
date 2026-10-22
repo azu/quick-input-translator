@@ -85,6 +85,10 @@ jobs:
       - run: bash scripts/test-version.sh
       - run: swift test
       - name: Package Apple Silicon app
+        env:
+          CODE_SIGN_P12_BASE64: ${{ secrets.CODE_SIGN_P12_BASE64 }}
+          CODE_SIGN_P12_PASSWORD: ${{ secrets.CODE_SIGN_P12_PASSWORD }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: bash scripts/package-release.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -92,6 +96,7 @@ jobs:
           path: |
             dist/quick-input-translator-macos-arm64.zip
             dist/quick-input-translator-macos-arm64.zip.sha256
+            dist/appcast.xml
           if-no-files-found: error
           retention-days: 7
 
@@ -128,5 +133,5 @@ jobs:
           else
             gh release create "$TAG" --verify-tag --draft --title "$TAG" --notes-file "$RUNNER_TEMP/release-body.md"
           fi
-          gh release upload "$TAG" dist/quick-input-translator-macos-arm64.zip dist/quick-input-translator-macos-arm64.zip.sha256 --clobber
+          gh release upload "$TAG" dist/quick-input-translator-macos-arm64.zip dist/quick-input-translator-macos-arm64.zip.sha256 dist/appcast.xml --clobber
           gh release edit "$TAG" --draft=false --latest

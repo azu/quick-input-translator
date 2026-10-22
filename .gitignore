@@ -1,5 +1,7 @@
 .build/
 .swiftpm/
 dist/
+.update-signing/
+.update-signing.staging.*/
 
 /.sdev/

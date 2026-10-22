@@ -56,7 +56,7 @@ staging_dir="$(mktemp -d "$project_dir/dist/.QuickTranslateInput.XXXXXX")"
 trap 'rm -rf "$staging_dir"' EXIT
 staged_bundle="$staging_dir/Quick Input Translator.app"
 bash "$project_dir/scripts/assemble-app.sh" "$staged_bundle" "$binary_dir/QuickTranslateInput"
-codesign --force --sign "$signing_identity" --timestamp=none "$staged_bundle"
+bash "$project_dir/scripts/sign-app.sh" "$staged_bundle" "$signing_identity"
 codesign --verify --strict "$staged_bundle"
 
 ensure_app_stopped

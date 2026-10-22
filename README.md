@@ -6,7 +6,7 @@ Translate the line or entire input field you’re writing without leaving your a
 
 ## Install
 
-Requires an Apple Silicon Mac running macOS 26 or later. Release downloads are ad-hoc signed and aren’t notarized. The commands below download the app and remove its quarantine attribute so it can be opened. Xcode and an Apple Development certificate aren’t needed for a release download.
+Requires an Apple Silicon Mac running macOS 26 or later. New release builds use a fixed self-signed certificate and aren’t notarized. The commands below download the app and remove its quarantine attribute so it can be opened. Xcode and an Apple Development certificate aren’t needed for a release download.
 
 Quit any running copy of Quick Input Translator and run these commands to install the latest release:
 
@@ -17,11 +17,13 @@ xattr -dr com.apple.quarantine "/Applications/Quick Input Translator.app" &&
 open "/Applications/Quick Input Translator.app"
 ```
 
-The app is installed in `/Applications`. For an update, quit the app and repeat the same commands; they automatically use the newest release. Because release builds use ad-hoc signing, you may need to remove and re-add the app in **System Settings → Privacy & Security → Accessibility** after updating. Language and trigger settings keep the same bundle identifier.
+The app is installed in `/Applications`. The first move from an older ad-hoc signed release to the fixed-certificate release requires removing and re-adding the app in **System Settings → Privacy & Security → Accessibility**. Later releases keep the same signing identity and bundle identifier to preserve permissions and saved settings. Permission retention across a real update still needs end-to-end verification.
+
+New release builds include automatic updates through Sparkle. They check daily, download verified updates in the background, and normally install them when you quit. Use **Check for Updates…** in the menu bar for an immediate check and an option to install and relaunch. **Automatically Check for Updates** and **Automatically Install Updates** can be changed independently; your choices are saved. Initial installation still requires the commands above. Older releases without Sparkle must be updated manually once.
 
 ## Build from source
 
-Local builds require macOS 26 or later, a compatible Xcode installation, and an Apple Development signing certificate in your keychain. No third-party dependencies or translation API keys are needed.
+Local builds require macOS 26 or later, a compatible Xcode installation, and an Apple Development signing certificate in your keychain. Swift Package Manager downloads the pinned Sparkle framework. No translation API keys are needed.
 
 ```sh
 bash scripts/build-app.sh
@@ -89,7 +91,7 @@ bash scripts/logs.sh --stream
 
 Logs record operation IDs, processing stages, app identifiers, numeric ranges, OS return codes, and whether replacement matched the expected result. Source text, translations, clipboard contents, and keystroke history aren’t logged or saved.
 
-Local builds use your Apple Development certificate and refuse to silently switch to ad-hoc signing. Release ZIPs explicitly use ad-hoc signing. Developer ID signing and notarization aren’t set up.
+Local builds use your Apple Development certificate and refuse to silently switch to ad-hoc signing. Release ZIPs use a pinned self-signed certificate. Update archives and the update feed also have Ed25519 signatures verified by Sparkle before installation. Local builds do not enable release updates. Developer ID signing and notarization aren’t set up.
 
 ## Development
 
@@ -117,7 +119,7 @@ Start with the [project documentation](docs/README.md) for the product, requirem
 
 `VERSION` is the source for the app version and release tag. Versions use `MAJOR.MINOR.PATCH`; tags use `vMAJOR.MINOR.PATCH`.
 
-Run **Create Release PR** in GitHub Actions on `main` and choose `patch`, `minor`, or `major` (default: `patch`). The workflow calculates the next version from `VERSION`, changes only that file, and opens a `release/v…` PR. Review and merge that PR to create the tag, run tests on macOS 26, and publish the Apple Silicon ZIP and SHA-256 checksum. Enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** if PR creation is disabled.
+Run **Create Release PR** in GitHub Actions on `main` and choose `patch`, `minor`, or `major` (default: `patch`). The workflow calculates the next version from `VERSION`, changes only that file, and opens a `release/v…` PR. Review and merge that PR to create the tag, run tests on macOS 26, and publish the Apple Silicon ZIP, SHA-256 checksum, and signed `appcast.xml`. Enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** if PR creation is disabled.
 
 The increments follow [Semantic Versioning](https://semver.org/): `patch` for compatible fixes, `minor` for compatible additions, and `major` for incompatible changes. Starting from `1.2.3`, they produce `1.2.4`, `1.3.0`, and `2.0.0` respectively. The same choices work locally with `bash scripts/version.sh --bump patch`. Releases use the normal three-part version format; prerelease labels and build metadata aren’t supported.
 
@@ -130,7 +132,19 @@ git tag "v$(cat VERSION)"
 git push origin "v$(cat VERSION)"
 ```
 
-The **Release** workflow also accepts an existing tag through manual dispatch for retries. It refuses a tag that differs from `VERSION`. Assets are attached to a draft before publication; a retry can replace assets in a draft, but doesn’t overwrite an already published release. Both workflows use `GITHUB_TOKEN`; no signing secrets or personal access token are required. If a bot merges the release PR using `GITHUB_TOKEN`, create and push the matching tag yourself, because that merge event won’t start another workflow.
+The **Release** workflow also accepts an existing tag through manual dispatch for retries. It refuses a tag that differs from `VERSION`. Assets are attached to a draft before publication; a retry can replace assets in a draft, but doesn’t overwrite an already published release. Both workflows use `GITHUB_TOKEN`; no personal access token is required. The Release workflow also requires the signing secrets described below. If a bot merges the release PR using `GITHUB_TOKEN`, create and push the matching tag yourself, because that merge event won’t start another workflow.
+
+Initial key generation requires OpenSSL 3 and the Swift toolchain. Before the first signed release, the maintainer runs `bash scripts/setup-update-signing.sh` once. This creates the public `config/update-signing.json` and private `.update-signing/` directory. Commit only the public config, and back up the private directory securely outside the checkout. Never regenerate these keys for a new release: losing or replacing them breaks update continuity. The setup refuses to replace existing material.
+
+Set these repository Actions secrets using the generated files:
+
+| Secret | Value |
+| --- | --- |
+| `CODE_SIGN_P12_BASE64` | Base64 encoding of `.update-signing/code-signing.p12` |
+| `CODE_SIGN_P12_PASSWORD` | Contents of `.update-signing/p12-password` |
+| `SPARKLE_PRIVATE_KEY` | Contents of `.update-signing/sparkle-private-key` |
+
+The build checks the certificate against the committed SHA-256 fingerprint and verifies the archive signature against the committed Sparkle public key. Missing or different keys stop the release. GitHub-hosted runners trust the certificate only for code signing and remove that trust at the end of packaging. For local packaging, run `bash scripts/trust-release-certificate.sh` once; macOS may ask you to authenticate. This adds only code-signing trust on the authoring Mac. Users installing the app do not need to import the certificate.
 
 To package a release locally without modifying the certificate-signed app in `dist`:
 

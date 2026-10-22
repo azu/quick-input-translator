@@ -19,6 +19,7 @@ import TranslationCore
     private var hotKey: GlobalHotKey?
     private var typingMonitor: TypingMonitor?
     private var statusItem: NSStatusItem?
+    private let updater = AppUpdater()
     private lazy var settings = SettingsWindow(model: model)
     private var task: Task<Void, Never>?
     private var pendingTrigger: Task<Void, Never>?
@@ -31,6 +32,7 @@ import TranslationCore
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Diagnostics.event("app.started", "build=\(Bundle.main.object(forInfoDictionaryKey: "QTIBuildID") as? String ?? "unknown") pid=\(getpid())")
+        updater.start()
         installMainMenu()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "Quick Input Translator")
@@ -42,6 +44,8 @@ import TranslationCore
         let setup = NSMenuItem(title: "Settings…", action: #selector(showSetup), keyEquivalent: "")
         setup.target = self
         menu.addItem(setup)
+        updater.addMenuItems(to: menu)
+        menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
@@ -111,6 +115,7 @@ import TranslationCore
         let settings = NSMenuItem(title: "Settings…", action: #selector(showSetup), keyEquivalent: ",")
         settings.target = self
         application.addItem(settings)
+        updater.addMenuItems(to: application)
         application.addItem(.separator())
         application.addItem(quit)
         applicationItem.submenu = application
