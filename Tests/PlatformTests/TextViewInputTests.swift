@@ -95,6 +95,37 @@ import TranslationCore
     #expect(view.string == composition)
 }
 
+@Test(arguments: ["...", "。。。", "…"])
+@MainActor func sentencePunctuationBeforeComposedTriggerRemainsInSource(marker: String) throws {
+    for mode in [CaptureMode.triggeredLine(.dots), .triggeredField(.dots)] {
+        let view = NSTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+        let prefix = "Hello. It's a nice day today.\n"
+        let sentence = "いい天気なので散歩したいですね。"
+        view.string = prefix + sentence
+        view.setSelectedRange(NSRange(location: view.string.utf16.count, length: 0))
+        view.setMarkedText(marker, selectedRange: NSRange(location: marker.utf16.count, length: 0),
+                           replacementRange: NSRange(location: NSNotFound, length: 0))
+        let checked = try TextViewInput.capture(view, mode: mode)
+        #expect(!view.hasMarkedText())
+        #expect(checked.sourceText == (mode.isWholeInput ? prefix + sentence : sentence))
+        #expect(view.string == prefix + sentence + marker)
+        // The workflow captures again after the preflight committed composition.
+        let target = try TextViewInput.capture(view, mode: mode)
+        #expect(target == checked)
+        let delegate = ChangeDelegate()
+        delegate.undo.groupsByEvent = false
+        view.delegate = delegate
+        view.allowsUndo = true
+        delegate.undo.beginUndoGrouping()
+        try TextViewInput.replace(view, target: target, translation: "Translation")
+        delegate.undo.endUndoGrouping()
+        #expect(view.string == (mode.isWholeInput ? "Translation" : prefix + "Translation"))
+        #expect(delegate.undo.canUndo)
+        delegate.undo.undo()
+        #expect(view.string == prefix + sentence + marker)
+    }
+}
+
 @Test @MainActor func newCompositionPreventsStaleNativeReplacement() throws {
     let view = NSTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
     view.string = "日本語..."

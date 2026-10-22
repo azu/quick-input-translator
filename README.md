@@ -93,6 +93,8 @@ Japanese input also works with the corresponding marker, without changing the tr
 
 These work for both line and whole-field translation. Half-width and Japanese characters for the same trigger can be mixed, such as `;；;`. Exactly three consecutive characters trigger translation; four or more do not. Only the final marker is removed from the source; the rest of your text is kept as typed.
 
+Punctuation already in your text is kept. For example, if you confirm `文章。` and then type `。。。`, the source is `文章。`. The existing sentence-ending period is not counted as part of the newly typed trigger.
+
 For `...`, automatic substitution to `…` also works. In the built-in field you can type the trigger before confirming Japanese composition; support in other apps depends on what their input fields expose.
 
 Type the trigger directly. Pasting a trigger, typing it in the middle of a line, or typing one, two, or four or more repeated characters does not start translation.

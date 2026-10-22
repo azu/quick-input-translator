@@ -16,7 +16,7 @@ func wholeInputIncludesAllLinesAndOnlyRemovesFinalMarker(trigger: TranslationTri
 }
 
 @Test(arguments: TranslationTrigger.allCases)
-func wholeInputRejectsMarkerBeforeFieldEndAndExcessiveMarkers(trigger: TranslationTrigger) {
+func wholeInputRejectsMarkerBeforeFieldEndAndNonfinalCaret(trigger: TranslationTrigger) {
     for text in ["日本語\(trigger.rawValue)\n後の行", "日本語\(trigger.rawValue)続き",
                  "日本語\(trigger.rawValue)\(trigger.character)"] {
         let caret = NSMaxRange((text as NSString).range(of: trigger.rawValue))
@@ -94,6 +94,26 @@ func wholeInputAcceptsJapaneseCompositionAndEllipsis(marker: String) throws {
             }
         }
     }
+}
+
+@Test(arguments: TranslationTrigger.allCases)
+func confirmationSeparatesExistingPunctuationFromNewTrigger(trigger: TranslationTrigger) throws {
+    let other = try #require(TranslationTrigger.allCases.first { $0 != trigger })
+    var detector = TranslationTriggerDetector(line: trigger, wholeInput: other)
+    #expect(detector.observe(trigger.japaneseInputCharacter) == nil)
+    #expect(detector.observe("\r") == nil) // Confirm the preceding Japanese sentence.
+    #expect(detector.observe(trigger.japaneseInputCharacter) == nil)
+    #expect(detector.observe(trigger.japaneseInputCharacter) == nil)
+    let candidate = detector.observe(trigger.japaneseInputCharacter)
+    let mode = try #require(candidate)
+    #expect(mode == .triggeredLine(trigger))
+    let source = "日本語" + trigger.japaneseInputCharacter
+    let text = source + trigger.japaneseInputMarker
+    let target = try TextTarget(text: text, selection: NSRange(location: text.utf16.count, length: 0), mode: mode)
+    #expect(target.sourceText == source)
+    // A fourth newly typed character invalidates the pending candidate.
+    #expect(detector.observe(trigger.japaneseInputCharacter) == nil)
+    #expect(detector.observe(trigger.character) == nil)
 }
 
 @Test(arguments: TranslationTrigger.allCases)

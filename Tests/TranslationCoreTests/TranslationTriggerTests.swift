@@ -28,16 +28,10 @@ func japaneseAndMixedMarkersPreserveSourceAndRanges(trigger: TranslationTrigger)
 }
 
 @Test(arguments: TranslationTrigger.allCases)
-func japaneseMarkersRejectIncompleteExcessiveWrongAndNonfinalInput(trigger: TranslationTrigger) {
+func japaneseMarkersRejectIncompleteWrongAndNonfinalInput(trigger: TranslationTrigger) {
     let character = trigger.japaneseInputCharacter
     var invalid = ["日本語" + character, "日本語" + character + character,
                    "日本語" + trigger.japaneseInputMarker + "続き"]
-    for count in [4, 5] {
-        for pattern in 0..<(1 << count) {
-            let marker = (0..<count).map { pattern & (1 << $0) == 0 ? trigger.character : character }.joined()
-            invalid.append("日本語" + marker)
-        }
-    }
     invalid += TranslationTrigger.allCases.filter { $0 != trigger }.map { "日本語" + $0.japaneseInputMarker }
     for text in invalid {
         for mode in [CaptureMode.triggeredLine(trigger), .triggeredField(trigger)] {
@@ -58,10 +52,9 @@ func triggeredLineExcludesMarkerFromSourceAndRemovesItOnSuccess(trigger: Transla
 }
 
 @Test(arguments: TranslationTrigger.allCases)
-func rejectsWrongIncompleteAndExcessiveMarkers(trigger: TranslationTrigger) {
+func rejectsWrongAndIncompleteMarkers(trigger: TranslationTrigger) {
     let alternatives = TranslationTrigger.allCases.filter { $0 != trigger }.map { "日本語\($0.rawValue)" }
-    let invalid = alternatives + ["日本語", "日本語\(trigger.character)", "日本語\(trigger.character)\(trigger.character)",
-                                  "日本語\(trigger.rawValue)\(trigger.character)"]
+    let invalid = alternatives + ["日本語", "日本語\(trigger.character)", "日本語\(trigger.character)\(trigger.character)"]
     for text in invalid {
         #expect(throws: InputError.noTrigger) {
             try TextTarget(text: text, selection: NSRange(location: (text as NSString).length, length: 0), mode: .triggeredLine(trigger))
@@ -85,8 +78,20 @@ func rejectsWrongIncompleteAndExcessiveMarkers(trigger: TranslationTrigger) {
     #expect(target.replacing(with: "Japanese") == "Japanese")
     #expect(TranslationTrigger.dots.accepts("。"))
     #expect(!TranslationTrigger.semicolons.accepts("。"))
-    #expect(throws: InputError.noTrigger) {
-        try TextTarget(text: "日本語。。。。", selection: NSRange(location: 7, length: 0), mode: .triggeredLine(.dots))
+}
+
+@Test(arguments: TranslationTrigger.allCases)
+func confirmedTriggerPreservesExistingMatchingPunctuation(trigger: TranslationTrigger) throws {
+    for punctuation in [trigger.character, trigger.japaneseInputCharacter] {
+        let source = "日本語" + punctuation
+        for marker in [trigger.rawValue, trigger.japaneseInputMarker] {
+            let text = source + marker
+            for mode in [CaptureMode.triggeredLine(trigger), .triggeredField(trigger)] {
+                let target = try TextTarget(text: text, selection: NSRange(location: text.utf16.count, length: 0), mode: mode)
+                #expect(target.sourceText == source)
+                #expect(target.triggerRange == NSRange(location: source.utf16.count, length: marker.utf16.count))
+            }
+        }
     }
 }
 

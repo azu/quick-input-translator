@@ -22,15 +22,15 @@ public enum TranslationTrigger: String, CaseIterable, Sendable {
     }
 
     public func source(in line: String) -> String? {
+        // The detector counts newly typed keys. An earlier sentence-ending
+        // period may be identical to the marker, so preserve it as source.
         let suffix = line.suffix(3)
         if suffix.count == 3, suffix.allSatisfy({ accepts(String($0)) }) {
-            let source = String(line.dropLast(3))
-            return accepts(source.last.map { String($0) }) ? nil : source
+            return String(line.dropLast(3))
         }
         // Some apps replace three typed periods with a typographic ellipsis.
         if self == .dots, line.hasSuffix("…") {
-            let source = String(line.dropLast())
-            return accepts(source.last.map { String($0) }) || source.hasSuffix("…") ? nil : source
+            return String(line.dropLast())
         }
         return nil
     }

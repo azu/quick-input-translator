@@ -38,12 +38,12 @@ import Testing
 @Test(arguments: TranslationTrigger.allCases)
 @MainActor func wholeInputWorkflowTranslatesOneStringAndReplacesOnce(trigger: TranslationTrigger) async throws {
     let input = StubInput(), engine = StubEngine()
-    input.text = "前の行\n\n日本語" + trigger.japaneseInputMarker
+    input.text = "前の行\n\n日本語。" + trigger.japaneseInputMarker
     input.selection = NSRange(location: input.text.utf16.count, length: 0)
     engine.result = "First line\n\nJapanese"
     let workflow = TranslationWorkflow(engine: engine, input: input)
     #expect(try await workflow.perform(mode: .triggeredField(trigger)))
-    #expect(engine.source == "前の行\n\n日本語")
+    #expect(engine.source == "前の行\n\n日本語。")
     #expect(engine.calls == 1)
     #expect(input.text == engine.result)
     #expect(input.replacements == 1)
