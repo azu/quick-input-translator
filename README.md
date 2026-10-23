@@ -4,7 +4,7 @@ Translate what you’re writing, right in the input field. This macOS menu bar a
 
 With the default settings, type `...` to translate the current line, or `:::` to translate the entire input field. You can choose the source language, target language, and both triggers.
 
-![Quick Input Translator settings with language and translation trigger options](docs/images/settings.png)
+https://github.com/user-attachments/assets/4094c55f-c2a7-4d6a-a06d-a7bf5ae06a36
 
 ## Install
 
